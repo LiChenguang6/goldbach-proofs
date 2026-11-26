@@ -8695,6 +8695,9 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
     (items : Finset ι) (g l r : ι → ℕ) (c : ι → ℂ)
     (F G : ℝ → ℂ) (sMeasurable : MeasurableSet (wide n (BB n) (BH n))ᶜ)
     {T A W : ℝ} (TLower : 1 ≤ T) (WNonnegative : 0 ≤ W)
+    (ANonnegative : 0 ≤ A)
+    (hA : A ≤ T ^ 2 * logBudget n)
+    (hW : W ≤ T * logBudget n)
     (FContinuous : Continuous F)
     (GMeasurable : Measurable G)
     (Gint : IntervalIntegrable (fun t => ‖G t‖ ^ 2) volume 0 1)
@@ -8716,11 +8719,49 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
     (FContinuous.norm.pow 2).intervalIntegrable 0 1
   have productBound := norm_indicator_product_le (b1B1_outsideScale_pos hn)
     sMeasurable FContinuous.measurable GMeasurable Fint Gint
-  have main : (1 / 2) *
+  have SPos : 0 < b1B1_outsideScale n := b1B1_outsideScale_pos hn
+  let A' := T ^ 2 * logBudget n
+  let W' := T * logBudget n
+  let bracket := (BM n : ℝ) ^ 2 * logBudget n ^ 2 +
+    (radius (BM n))⁻¹ * (1 + Real.log (BM n : ℝ)) ^ 3
+  have BNonneg : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
+  have TNonneg : 0 ≤ T := zero_le_one.trans TLower
+  have hA2 : A ^ 2 ≤ A' ^ 2 := by nlinarith [hA, ANonnegative, TNonneg, BNonneg]
+  have hW2 : W ^ 2 ≤ W' ^ 2 := by nlinarith [hW, WNonnegative, TNonneg, BNonneg]
+  have hb : 0 ≤ bracket := by positivity
+  have hA128 : ((n : ℝ) + 1) * A ^ 2 ≤ ((n : ℝ) + 1) * A' ^ 2 :=
+    mul_le_mul_of_nonneg_left hA2 (by positivity)
+  have e1 : b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2 ≤
+      b1B1_outsideScale n * (((n : ℝ) + 1) * A' ^ 2) := by
+    have e1a : b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2 ≤
+        b1B1_outsideScale n * (((n : ℝ) + 1) * A ^ 2) :=
+      mul_le_mul_of_nonneg_left Fbound SPos.le
+    exact e1a.trans <| mul_le_mul_of_nonneg_left hA128 SPos.le
+  have hW128 : 128 * W ^ 2 * bracket ≤ 128 * W' ^ 2 * bracket := by
+    apply mul_le_mul_of_nonneg_right
+    · apply mul_le_mul_of_nonneg_left hW2
+      · norm_num
+    · exact hb
+  have e2 : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
+      (b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket) := by
+    have e2a : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
+        (b1B1_outsideScale n)⁻¹ * (128 * W ^ 2 * bracket) :=
+      mul_le_mul_of_nonneg_left Gbound (inv_nonneg.mpr SPos.le)
+    exact e2a.trans <| mul_le_mul_of_nonneg_left hW128 (inv_nonneg.mpr SPos.le)
+  have main : (1 / 2 : ℝ) *
       ((b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) +
         ((b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2)) ≤
       577 * finalScale n T := by
-    sorry
+    have conc := b1B1_outside_budget_le hn TLower
+    calc
+      (1 / 2 : ℝ) *
+        ((b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) +
+          ((b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2))
+        ≤ (1 / 2 : ℝ) *
+            ((b1B1_outsideScale n * (((n : ℝ) + 1) * A' ^ 2)) +
+              ((b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket))) :=
+          mul_le_mul_of_nonneg_left (add_le_add e1 e2) (by norm_num)
+      _ ≤ 577 * finalScale n T := conc
   exact productBound.trans main
 
 -- ===========================================================================
