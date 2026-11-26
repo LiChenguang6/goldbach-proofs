@@ -8750,8 +8750,8 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
     have conc := b1B1_outside_budget_le hn TLower
     calc
       (1 / 2 : ℝ) *
-        ((b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) +
-          ((b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2)))
+        (b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2 +
+          (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2)
         ≤ (1 / 2 : ℝ) *
             (b1B1_outsideScale n * (((n : ℝ) + 1) * A' ^ 2) +
               (b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket)) :=
