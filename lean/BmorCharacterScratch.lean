@@ -298,7 +298,7 @@ theorem inverseSquare_integral (a b : ℝ) (ha : 0 < a) (hab : a ≤ b) :
   have hzero : (0 : ℝ) ∉ Set.uIcc a b := by
     rw [Set.uIcc_of_le hab]
     exact fun h => (not_le_of_gt ha) h.1
-  have h := intervalIntegral.integral_zpow (a := a) (b := b) (n := -2)
+  have h := integral_zpow (a := a) (b := b) (n := -2)
     (Or.inr ⟨by decide, hzero⟩)
   simpa [zpow_neg, one_div, neg_sub] using h
 
@@ -313,7 +313,11 @@ theorem inverseSquare_step_integral (a b h : ℝ) (ha : 0 < a)
     apply intervalIntegrable_iff.mpr
     exact hbase.def'.integrable.indicator measurableSet_Iic
   rw [intervalIntegral.integral_sub hbase hind]
-  rw [intervalIntegral.integral_indicator (f := fun t : ℝ => 1/t^2) ⟨hah, hhb⟩]
+  have heq : (∫ t in a..b, (Set.Iic h).indicator (fun t : ℝ => 1/t^2) t) =
+      ∫ t in a..h, 1/t^2 := by
+    exact intervalIntegral.integral_indicator (μ := MeasureTheory.volume)
+      (f := fun t : ℝ => 1/t^2) ⟨hah, hhb⟩
+  rw [heq]
   rw [inverseSquare_integral a b ha hab, inverseSquare_integral a h ha hah]
   ring
 
@@ -359,7 +363,104 @@ theorem zeroCount_partialSummation_bound (d a b : ℝ) (hd : 0 < d)
   have h1 := div_le_div_of_nonneg_right (hN b ⟨hab, le_rfl⟩) hb.le
   have h2 := zeroCount_weighted_budget d a b hd ha hab N hN hint
   have h3 := zeroCount_endpoint_identity d b hd hb
-  rw [hPS]
-  linarith
+  rw [hPS, neg_div]
+  linarith only [h1, h2, h3]
+
+
+/- Standard zero term estimates used with a truncated explicit formula.
+   No zero-free region, GRH or zero-counting assertion is assumed implicitly. -/
+theorem zeroTerm_norm (x : ℝ) (ρ : ℂ) (hx : 0 < x) :
+    ‖(x : ℂ)^ρ / ρ‖ = x^ρ.re / ‖ρ‖ := by
+  rw [norm_div, Complex.norm_cpow_eq_rpow_re_of_pos hx]
+
+theorem zeroTerm_height_bound (x σ : ℝ) (ρ : ℂ)
+    (hx : 1 ≤ x) (hre : ρ.re ≤ σ) (hi : 0 < |ρ.im|) :
+    ‖(x : ℂ)^ρ / ρ‖ ≤ x^σ / |ρ.im| := by
+  rw [zeroTerm_norm x ρ (by linarith)]
+  have hnorm : |ρ.im| ≤ ‖ρ‖ := Complex.abs_im_le_norm _
+  calc
+    _ ≤ x^σ / ‖ρ‖ := div_le_div_of_nonneg_right
+      (Real.rpow_le_rpow_of_exponent_le hx hre) (norm_nonneg _)
+    _ ≤ _ := div_le_div_of_nonneg_left (Real.rpow_nonneg (by linarith) _)
+      hi hnorm
+
+theorem zeroBand_norm_bound {ι : Type*} (s : Finset ι) (ρ : ι → ℂ)
+    (x σ : ℝ) (hx : 1 ≤ x) (hre : ∀ i ∈ s, (ρ i).re ≤ σ)
+    (hi : ∀ i ∈ s, 0 < |(ρ i).im|) :
+    ‖∑ i ∈ s, (x : ℂ)^(ρ i) / ρ i‖ ≤
+      x^σ * ∑ i ∈ s, 1/|(ρ i).im| := by
+  calc
+    _ ≤ ∑ i ∈ s, ‖(x : ℂ)^(ρ i) / ρ i‖ := norm_sum_le _ _
+    _ ≤ ∑ i ∈ s, x^σ / |(ρ i).im| := by
+      exact Finset.sum_le_sum (fun i hi' =>
+        zeroTerm_height_bound x σ (ρ i) hx (hre i hi') (hi i hi'))
+    _ = _ := by
+      rw [Finset.mul_sum]
+      apply Finset.sum_congr rfl
+      intro i hi'
+      ring
+
+/-- When the critical-line calculation is available, the low zero band
+    has the exact square-root scaling in the explicit formula. -/
+theorem criticalLine_band_bound {ι : Type*} (s : Finset ι) (ρ : ι → ℂ)
+    (x : ℝ) (hx : 1 ≤ x)
+    (hre : ∀ i ∈ s, (ρ i).re = 1/2)
+    (hi : ∀ i ∈ s, 0 < |(ρ i).im|) :
+    ‖∑ i ∈ s, (x : ℂ)^(ρ i) / ρ i‖ ≤
+      Real.sqrt x * ∑ i ∈ s, 1/|(ρ i).im| := by
+  rw [← Real.rpow_one_half]
+  exact zeroBand_norm_bound s ρ x (1/2) hx (fun i h => (hre i h).le) hi
+
+/-- For a real-part gap δ, isolate the exponential decay factor. -/
+theorem rpow_zeroFree_decay (x δ : ℝ) (hx : 0 < x) :
+    x^(1-δ) = x * Real.exp (-δ * Real.log x) := by
+  rw [Real.rpow_def_of_pos hx]
+  rw [show Real.log x * (1-δ) = Real.log x + (-δ * Real.log x) by ring,
+    Real.exp_add, Real.exp_log hx]
+
+theorem zeroFree_band_bound {ι : Type*} (s : Finset ι) (ρ : ι → ℂ)
+    (x δ : ℝ) (hx : 1 ≤ x)
+    (hre : ∀ i ∈ s, (ρ i).re ≤ 1-δ)
+    (hi : ∀ i ∈ s, 0 < |(ρ i).im|) :
+    ‖∑ i ∈ s, (x : ℂ)^(ρ i) / ρ i‖ ≤
+      x * Real.exp (-δ * Real.log x) * ∑ i ∈ s, 1/|(ρ i).im| := by
+  rw [← rpow_zeroFree_decay x δ (by linarith)]
+  exact zeroBand_norm_bound s ρ x (1-δ) hx hre hi
+
+/-- Combine disjoint zero bands and the analytic truncation remainder.
+    The explicit-formula equality and zero-free estimates remain hypotheses. -/
+theorem explicitFormula_three_bands {ι : Type*} (s₁ s₂ s₃ : Finset ι)
+    (ρ : ι → ℂ) (x δ : ℝ) (E R : ℂ) (B : ℝ)
+    (hx : 1 ≤ x)
+    (h₁ : ∀ i ∈ s₁, (ρ i).re = 1/2)
+    (h₂ : ∀ i ∈ s₂, (ρ i).re ≤ 1-δ)
+    (h₃ : ∀ i ∈ s₃, (ρ i).re ≤ 1)
+    (hi₁ : ∀ i ∈ s₁, 0 < |(ρ i).im|)
+    (hi₂ : ∀ i ∈ s₂, 0 < |(ρ i).im|)
+    (hi₃ : ∀ i ∈ s₃, 0 < |(ρ i).im|)
+    (hR : ‖R‖ ≤ B)
+    (hE : E = -(∑ i ∈ s₁, (x : ℂ)^(ρ i)/ρ i) -
+      (∑ i ∈ s₂, (x : ℂ)^(ρ i)/ρ i) -
+      (∑ i ∈ s₃, (x : ℂ)^(ρ i)/ρ i) + R) :
+    ‖E‖ ≤ Real.sqrt x * (∑ i ∈ s₁, 1/|(ρ i).im|) +
+      x * Real.exp (-δ * Real.log x) * (∑ i ∈ s₂, 1/|(ρ i).im|) +
+      x * (∑ i ∈ s₃, 1/|(ρ i).im|) + B := by
+  have ha := criticalLine_band_bound s₁ ρ x hx h₁ hi₁
+  have hb := zeroFree_band_bound s₂ ρ x δ hx h₂ hi₂
+  have hc := zeroBand_norm_bound s₃ ρ x 1 hx h₃ hi₃
+  rw [Real.rpow_one] at hc
+  rw [hE]
+  calc
+    _ ≤ ‖-(∑ i ∈ s₁, (x : ℂ)^(ρ i)/ρ i) -
+        (∑ i ∈ s₂, (x : ℂ)^(ρ i)/ρ i) -
+        (∑ i ∈ s₃, (x : ℂ)^(ρ i)/ρ i)‖ + ‖R‖ := norm_add_le _ _
+    _ ≤ _ := by
+      have hd := norm_sub_le (-(∑ i ∈ s₁, (x : ℂ)^(ρ i)/ρ i) -
+        (∑ i ∈ s₂, (x : ℂ)^(ρ i)/ρ i))
+        (∑ i ∈ s₃, (x : ℂ)^(ρ i)/ρ i)
+      have he := norm_sub_le (-(∑ i ∈ s₁, (x : ℂ)^(ρ i)/ρ i))
+        (∑ i ∈ s₂, (x : ℂ)^(ρ i)/ρ i)
+      rw [norm_neg] at he
+      linarith only [ha, hb, hc, hd, he, hR]
 
 end BmorScratch
