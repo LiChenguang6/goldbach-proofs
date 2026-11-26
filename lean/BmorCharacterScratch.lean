@@ -1221,4 +1221,164 @@ theorem unsmooth_twist_bound {q : ℕ} [NeZero q]
     _ ≤ _ := hQ
     _ = _ := by field_simp [hh'.ne'] <;> ring
 
+
+/- Absolute convergence of the smoothed Perron integral on c > 1.
+   Unlike the contour shift, this requires no zero information. -/
+theorem perronKernel_global_bound (x c t : ℝ) (hx : 0 < x) (hc : 1 ≤ c) :
+    ‖perronKernel x c t‖ ≤ x^c * (1+t^2)⁻¹ := by
+  rw [perronKernel_norm x c t hx]
+  have hc2 : 1 ≤ c^2 := by nlinarith
+  have hc3 : 1 ≤ (c+1)^2 := by nlinarith
+  have h1 : Real.sqrt (1+t^2) ≤ Real.sqrt (c^2+t^2) :=
+    Real.sqrt_le_sqrt (by linarith)
+  have h2 : Real.sqrt (1+t^2) ≤ Real.sqrt ((c+1)^2+t^2) :=
+    Real.sqrt_le_sqrt (by linarith)
+  have hm := mul_le_mul h1 h2 (Real.sqrt_nonneg _) (Real.sqrt_nonneg _)
+  rw [← sq, Real.sq_sqrt (by positivity)] at hm
+  rw [← div_eq_mul_inv]
+  exact div_le_div_of_nonneg_left (Real.rpow_nonneg hx.le _) (by positivity) hm
+
+theorem perronKernel_measurable (x c : ℝ) :
+    Measurable (perronKernel x c) := by
+  unfold perronKernel
+  apply Measurable.div
+  · fun_prop
+  · fun_prop
+
+theorem perronKernel_integrable (x c : ℝ) (hx : 0 < x) (hc : 1 ≤ c) :
+    Integrable (perronKernel x c) := by
+  apply (integrable_inv_one_add_sq.const_mul (x^c)).mono'
+    (perronKernel_measurable x c).aestronglyMeasurable
+  filter_upwards with t
+  exact perronKernel_global_bound x c t hx hc
+
+theorem LSeries_term_vertical_norm (f : ℕ → ℂ) (c t : ℝ) (k : ℕ) :
+    ‖LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k‖ =
+      ‖LSeries.term f (c:ℂ) k‖ := by
+  simp only [LSeries.norm_term_eq, Complex.add_re, Complex.mul_re, Complex.ofReal_re,
+    Complex.ofReal_im, Complex.I_re, Complex.I_im, mul_zero, zero_mul, sub_self,
+    sub_zero, add_zero]
+
+theorem perron_series_term_measurable (f : ℕ → ℂ) (x c : ℝ) (k : ℕ) :
+    Measurable (fun t : ℝ => perronKernel x c t *
+      LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k) := by
+  apply (perronKernel_measurable x c).mul
+  by_cases hk : k=0
+  · subst k
+    simp
+  · simp only [LSeries.term_of_ne_zero hk]
+    apply measurable_const.div
+    fun_prop
+
+theorem perron_series_term_integrable (f : ℕ → ℂ) (x c : ℝ)
+    (hx : 0 < x) (hc : 1 ≤ c) (k : ℕ) :
+    Integrable (fun t : ℝ => perronKernel x c t *
+      LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k) := by
+  apply ((perronKernel_integrable x c hx hc).norm.mul_const
+    ‖LSeries.term f (c:ℂ) k‖).mono'
+    (perron_series_term_measurable f x c k).aestronglyMeasurable
+  filter_upwards with t
+  rw [norm_mul, LSeries_term_vertical_norm]
+
+/-- The infinite sum can pass through the absolutely convergent smoothed
+    Perron integral. This is the substantive analytic interchange step. -/
+theorem perron_LSeries_interchange (f : ℕ → ℂ) (x c : ℝ)
+    (hx : 0 < x) (hc : 1 ≤ c) (hS : LSeriesSummable f (c:ℂ)) :
+    (∫ t : ℝ, perronKernel x c t * LSeries f ((c:ℂ)+(t:ℂ)*Complex.I)) =
+      ∑' k : ℕ, ∫ t : ℝ, perronKernel x c t *
+        LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k := by
+  have hsum : Summable (fun k : ℕ => ∫ t : ℝ,
+      ‖perronKernel x c t * LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k‖) := by
+    have hh : Summable (fun k : ℕ => ‖LSeries.term f (c:ℂ) k‖) := hS.norm
+    convert hh.mul_left (∫ t : ℝ, ‖perronKernel x c t‖) using 1
+    funext k
+    simp_rw [norm_mul, LSeries_term_vertical_norm]
+    rw [integral_mul_const]
+  rw [integral_tsum_of_summable_integral_norm
+    (perron_series_term_integrable f x c hx hc) hsum]
+  apply integral_congr_ae
+  filter_upwards with t
+  unfold LSeries
+  rw [tsum_mul_left]
+
+/-- A single Dirichlet coefficient in the smoothed Perron integral. -/
+theorem perron_single_term (f : ℕ → ℂ) (x c : ℝ) (hx : 0 < x)
+    (hc : 1 ≤ c) (k : ℕ) (hk : k ≠ 0) :
+    ((1/(2*Real.pi):ℝ):ℂ) *
+      (∫ t : ℝ, perronKernel x c t *
+        LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k) =
+      f k * ((max (1-(k:ℝ)/x) 0:ℝ):ℂ) := by
+  have hk' : 0 < (k:ℝ) := by exact_mod_cast Nat.pos_of_ne_zero hk
+  have hinv := smoothed_perron_inversion c ((k:ℝ)/x) hc (div_pos hk' hx)
+  have he (t : ℝ) : perronKernel x c t *
+      LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k =
+      f k * ((((k:ℝ)/x:ℝ):ℂ)^(-((c:ℂ)+(t:ℂ)*Complex.I)) *
+      (1/(((c:ℂ)+(t:ℂ)*Complex.I)*((c:ℂ)+(t:ℂ)*Complex.I+1)))) := by
+    rw [perronKernel, LSeries.term_of_ne_zero hk, Complex.ofReal_div,
+      Complex.div_cpow_ofReal_nonneg hk'.le hx.le, Complex.cpow_neg, Complex.cpow_neg]
+    push_cast
+    ring
+  unfold mellinInv at hinv
+  rw [show (∫ t : ℝ, perronKernel x c t *
+      LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k) =
+      ∫ t : ℝ, f k * ((((k:ℝ)/x:ℝ):ℂ)^(-((c:ℂ)+(t:ℂ)*Complex.I)) *
+      (1/(((c:ℂ)+(t:ℂ)*Complex.I)*((c:ℂ)+(t:ℂ)*Complex.I+1)))) by
+        exact integral_congr_ae (Filter.Eventually.of_forall he)]
+  rw [integral_const_mul]
+  change ((1/(2*Real.pi):ℝ):ℂ) * _ = _
+  rw [← hinv]
+  simp only [Complex.real_smul, smul_eq_mul]
+  ring
+
+/-- Exact smoothed Perron identity for integer x, using finite support of
+    the triangular cutoff. No analytic remainder or zero estimate is used. -/
+theorem perron_integratedTwist {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
+    (n : ℕ) (hn : 0 < n) (c : ℝ) (hc : 1 < c) :
+    integratedTwist χ n =
+      (n:ℂ) * ((1/(2*Real.pi):ℝ):ℂ) *
+        ∫ t : ℝ, perronKernel n c t *
+          (-deriv (DirichletCharacter.LFunction χ) ((c:ℂ)+(t:ℂ)*Complex.I) /
+            DirichletCharacter.LFunction χ ((c:ℂ)+(t:ℂ)*Complex.I)) := by
+  have hn' : 0 < (n:ℝ) := by exact_mod_cast hn
+  have hs : LSeriesSummable (twistCoeff χ) (c:ℂ) :=
+    LSeriesSummable_of_sum_norm_bigO (twistCoeff_sum_norm_bigO χ) (by norm_num)
+      (by simpa using hc)
+  simp_rw [← twistLSeries_eq_logDeriv χ _ (by
+    simp [Complex.add_re, Complex.mul_re]; linarith)]
+  rw [perron_LSeries_interchange (twistCoeff χ) n c hn' hc.le hs]
+  rw [mul_assoc, ← tsum_mul_left, ← tsum_mul_left]
+  have hterm (k : ℕ) :
+      (n:ℂ) * (((1/(2*Real.pi):ℝ):ℂ) *
+        ∫ t : ℝ, perronKernel n c t *
+          LSeries.term (twistCoeff χ) ((c:ℂ)+(t:ℂ)*Complex.I) k) =
+      if k ≤ n then ((n:ℂ)-(k:ℂ))*twistCoeff χ k else 0 := by
+    by_cases hk : k=0
+    · subst k
+      simp [twistCoeff]
+    rw [perron_single_term (twistCoeff χ) n c hn' hc.le k hk]
+    by_cases hkn : k ≤ n
+    · have hkn' : (k:ℝ) ≤ n := by exact_mod_cast hkn
+      have hm : 0 ≤ 1-(k:ℝ)/(n:ℝ) := by
+        rw [sub_nonneg, div_le_iff₀ hn']
+        simpa using hkn'
+      rw [if_pos hkn, max_eq_left hm]
+      push_cast
+      have hnC : (n:ℂ) ≠ 0 := by exact_mod_cast hn.ne'
+      field_simp [hnC]
+      <;> ring
+    · have hkn' : (n:ℝ) ≤ k := by exact_mod_cast (Nat.le_of_lt (lt_of_not_ge hkn))
+      have hm : 1-(k:ℝ)/(n:ℝ) ≤ 0 := by
+        rw [sub_nonpos, le_div_iff₀ hn']
+        simpa using hkn'
+      simp [hkn, max_eq_right hm]
+  simp_rw [hterm]
+  rw [tsum_eq_sum (s := Finset.range (n+1))]
+  · unfold integratedTwist
+    apply Finset.sum_congr rfl
+    intro k hk
+    exact (if_pos (Finset.mem_range_succ_iff.mp hk)).symm
+  · intro k hk
+    have hkn : ¬ k ≤ n := fun h => hk (Finset.mem_range_succ_iff.mpr h)
+    simp [hkn]
+
 end BmorScratch
