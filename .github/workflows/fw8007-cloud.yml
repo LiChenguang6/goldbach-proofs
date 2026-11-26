@@ -12,6 +12,23 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Read public target status
+        continue-on-error: true
+        run: |
+          curl -fsSL --max-time 30 https://www.movan.tech/goldbach/api/status -o /tmp/goldbach-status.json
+          python - <<'PY'
+          import json
+          def visit(x):
+              if isinstance(x, dict):
+                  if x.get("id") == "L-goldbach-fixed-ap-bmor-psi" or x.get("gap_id") == "L-goldbach-fixed-ap-bmor-psi":
+                      print(json.dumps(x))
+                  if "L-goldbach-fixed-ap-bmor-psi" in x:
+                      print(json.dumps(x["L-goldbach-fixed-ap-bmor-psi"]))
+                  for v in x.values(): visit(v)
+              elif isinstance(x, list):
+                  for v in x: visit(v)
+          visit(json.load(open("/tmp/goldbach-status.json")))
+          PY
       - name: Install Elan
         run: |
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
