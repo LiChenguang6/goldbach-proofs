@@ -8879,9 +8879,9 @@ theorem b1B1_primitive_budget_le (n : ℕ) (nLower : 2 ≤ n)
     {T : ℝ} (TLower : 1 ≤ T) :
     (16 * (B₁ n : ℝ) * T ^ 3 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) *
       ((BM n : ℝ) * (T * logBudget n)) ≤ 160 * finalScale n T := by
-  have nPositive : 0 < (n : ℝ) := by linarith [nLower]
-  have hn : 1 ≤ (n : ℝ) := by linarith [nLower]
+  have nPositive : 0 < (n : ℝ) := Nat.cast_pos.mpr (by omega)
   have hnNat : 1 ≤ n := by omega
+  have hn : 1 ≤ (n : ℝ) := exact_mod_cast hnNat
   have BNonneg : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
   have hB1 : (B₁ n : ℝ) ≤ (n : ℝ) ^ (1 / 4 : ℝ) := Nat.floor_le (by positivity)
   have hBM : (BM n : ℝ) ≤ (n : ℝ) ^ (2 / 5 : ℝ) := b1B1_stepLow_le_power n
