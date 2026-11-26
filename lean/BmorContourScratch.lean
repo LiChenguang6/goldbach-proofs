@@ -3779,7 +3779,7 @@ theorem rightHalf_exists_certified_rectangle {q : ℕ} [NeZero q]
   have hdenpos (t : ℝ) : 0 < (1:ℝ)/(3*((10 / Real.log (23/22)) *
         Real.log ((q:ℝ)*(2+|t+1/2|)) + 1)) := by
     have hlog : 0 ≤ Real.log ((q:ℝ)*(2+|t+1/2|)) :=
-      Real.log_nonneg (one_le_mul_of_one_le_of_one_le hq (by positivity))
+      Real.log_nonneg (one_le_mul_of_one_le_of_one_le hq (by linarith [abs_nonneg (t+1/2)]))
     positivity
   have hbot : u < z.im := by
     apply lt_of_le_of_ne hi
