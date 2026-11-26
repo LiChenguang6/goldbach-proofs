@@ -6975,3 +6975,64 @@ theorem b1B1_deepPairIntegral_le (n : ℕ) (nLower : 2 ≤ n)
   sorry
 
 end GoldbachB1B1Assembly
+
+namespace GoldbachB1B1LowCoeff
+
+open Finset Filter ArithmeticFunction
+open GoldbachB1B1 GoldbachB1B1Target
+
+/-- Inner Möbius weight `Σ_{d|a, U n<d} μ d` bounded by the divisor card of `a`. -/
+private theorem b1B1_inner_moebius_le (n a : ℕ) :
+    |(∑ d ∈ (Nat.divisors a).filter (fun d => U n < d), μ d : ℝ)| ≤
+      (a.divisors.card : ℝ) := by
+  set s := (Nat.divisors a).filter (fun d => U n < d)
+  have h : ‖(∑ d ∈ s, μ d : ℝ)‖ ≤ ∑ d ∈ s, ‖(μ d : ℝ)‖ := norm_sum_le s (fun d => μ d)
+  rw [Real.norm_eq_abs] at h
+  calc
+    _ ≤ ∑ d ∈ s, |μ d| := h
+    _ ≤ ∑ d ∈ s, (1 : ℝ) := by
+      refine sum_le_sum fun d _ => ?_
+      have key : |(ArithmeticFunction.moebius d : ℝ)| ≤ 1 := by
+        exact_mod_cast abs_moebius_le_one (n := d)
+      simpa [μ] using key
+    _ ≤ ∑ d ∈ Nat.divisors a, (1 : ℝ) :=
+      sum_le_sum_of_subset_of_nonneg (filter_subset _ _) (fun _ _ _ => zero_le_one)
+    _ = (a.divisors.card : ℝ) := by rw [sum_const, nsmul_eq_mul, mul_one]
+
+/-- Low-band coefficient L∞ bound: `|τ₁ n m| ≤ d(m)^2 · log n`.
+    Isomorphic to reference `abs_lowBandCoefficient_le` (L6818), with
+    `U ↦ U n`, `B ↦ B₁ n`; the inner μ-sum is the reference `lowMoebiusWeight`. -/
+theorem b1B1_tau1_coeff_le (n m : ℕ) (mBound : m ≤ n) (nPositive : 0 < n) :
+    |τ₁ n m| ≤ (m.divisors.card : ℝ) ^ 2 * Real.log n := by
+  have logNonnegative : 0 ≤ Real.log n := Real.log_nonneg (by exact_mod_cast nPositive)
+  have logLambda (a : ℕ) (member : a ∈ m.divisors) :
+      ArithmeticFunction.vonMangoldt (m / a) ≤ Real.log n := by
+    have aDivides := Nat.dvd_of_mem_divisors member
+    have mPositive : 0 < m := Nat.pos_of_ne_zero (Nat.ne_zero_of_mem_divisors member)
+    have aPositive := Nat.pos_of_mem_divisors member
+    have quotientPositive := Nat.div_pos (Nat.le_of_dvd mPositive aDivides) aPositive
+    refine vonMangoldt_le_log.trans (Real.log_le_log (by exact_mod_cast quotientPositive) ?_)
+    exact_mod_cast (Nat.div_le_self m a).trans mBound
+  have tau (a : ℕ) (member : a ∈ m.divisors) :
+      (a.divisors.card : ℝ) ≤ (m.divisors.card : ℝ) := by
+    apply Nat.cast_le.mpr
+    apply card_le_card
+    intro d dMember
+    exact Nat.mem_divisors.mpr ⟨(Nat.dvd_of_mem_divisors dMember).trans (Nat.dvd_of_mem_divisors member),
+      Nat.ne_zero_of_mem_divisors member⟩
+  rw [← Real.norm_eq_abs, b1B1_tau1_atom_sum]
+  refine (norm_sum_le (E := ℝ) _ _).trans ?_
+  calc
+    _ ≤ ∑ a ∈ (Nat.divisors m).filter (fun a => U n < a ∧ a ≤ B₁ n ∧ U n < m / a),
+        (m.divisors.card : ℝ) * Real.log n := by
+      refine sum_le_sum fun a membership => ?_
+      have divisor := (mem_filter.mp membership).1
+      rw [norm_mul, Real.norm_eq_abs, Real.norm_eq_abs, abs_of_nonneg vonMangoldt_nonneg]
+      exact mul_le_mul ((b1B1_inner_moebius_le n a).trans (tau a divisor)) (logLambda a divisor)
+        vonMangoldt_nonneg (Nat.cast_nonneg _)
+    _ ≤ ∑ _ ∈ Nat.divisors m, (m.divisors.card : ℝ) * Real.log n :=
+      sum_le_sum_of_subset_of_nonneg (filter_subset _ _) (fun _ _ _ =>
+        mul_nonneg (Nat.cast_nonneg _) logNonnegative)
+    _ = _ := by rw [sum_const, nsmul_eq_mul]; ring
+
+end GoldbachB1B1LowCoeff
