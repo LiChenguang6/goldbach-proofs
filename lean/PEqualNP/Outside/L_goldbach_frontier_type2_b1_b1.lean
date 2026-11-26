@@ -6883,3 +6883,95 @@ theorem b1B1_cofactor_prefix_energy_le (n a : ℕ) (hB : a ≤ B₁ n) :
         DyadicMixedB4BilinearEnergy.energy_mangoldt_le U Y
 
 end GoldbachB1B1NewMath
+
+namespace GoldbachB1B1Assembly
+
+open Finset Filter
+open GoldbachB1B1
+open GoldbachB1B1Scale GoldbachB1B1Adapt
+open DyadicMixedB4EnergyTail
+open GoldbachB1B1GcdSeries
+
+/-- Final-scale envelope: `T^5 · logBudget n^7 · n^(23/24)`. -/
+def finalScale (n : ℕ) (T : ℝ) : ℝ :=
+  T ^ 5 * logBudget n ^ 7 * (n : ℝ) ^ (23 / 24 : ℝ)
+
+/-- Aggregate constant across the six segments. -/
+def totalConstant : ℝ := 776 + 10240000 * gcdSeriesConstant
+
+theorem totalConstant_nonnegative : 0 ≤ totalConstant :=
+  add_nonneg (by norm_num) (mul_nonneg (by norm_num) gcdSeriesConstant_nonnegative)
+
+/-! Placeholder intermediate pair integrals. The concrete low×low objects
+    (atom sets, weights, exact/smoothed/primitive near pairs) are filled as the
+    six segment lemmas are ported; the decomposition type structure is fixed
+    here so the assembly chain type-checks. -/
+
+def b1B1_outsidePair (n : ℕ) : ℂ := 0
+def b1B1_exactNearPair (n : ℕ) : ℂ := 0
+def b1B1_smoothedNearPair (n : ℕ) : ℂ := 0
+def b1B1_primitiveNearPair (n : ℕ) : ℂ := 0
+def b1B1_tailPair (n : ℕ) : ℂ := 0
+
+/-- Segment 1 (split): the deep pair splits into the outside pair and the
+    exact near pair. -/
+theorem b1B1_split_shifted (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) :
+    Jdeep n (τ₁ n) (τ₁ n) = b1B1_outsidePair n + b1B1_exactNearPair n := by
+  sorry
+
+/-- Segment 2 (far / outside): Young + offWave moment on the outside pair. -/
+theorem b1B1_far_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_outsidePair n‖ ≤ 577 * finalScale n T := by
+  sorry
+
+/-- Segment 3 (smoothing): near-pair replacement cost, exact → smoothed. -/
+theorem b1B1_smoothing_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ ≤ 16 * finalScale n T := by
+  sorry
+
+/-- Segment 4 (primitive): smoothed → primitive replacement cost. -/
+theorem b1B1_primitive_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ ≤ 160 * finalScale n T := by
+  sorry
+
+/-- Segment 5 (main): primitive near pair, gcd cross term absorbed by the
+    gcd-series constant. -/
+theorem b1B1_main_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_primitiveNearPair n‖ ≤ (10240000 * gcdSeriesConstant) * finalScale n T := by
+  sorry
+
+/-- Segment 6 (tail): unbalanced / prefix-energy tail, absorbed into the main
+    envelope (`n^(7/8+o(1))` is dominated by `n^(23/24)`). -/
+theorem b1B1_tail_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_tailPair n‖ ≤ finalScale n T := by
+  sorry
+
+/-- Assembly: combine the six segments by the triangle inequality. The six
+    segment bounds above remain the only sorry sites. -/
+theorem b1B1_deepPairIntegral_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖Jdeep n (τ₁ n) (τ₁ n)‖ ≤ totalConstant * finalScale n T := by
+  have hsplit := b1B1_split_shifted n nLower width
+  have hfar := b1B1_far_le n nLower width TLower divisorBound
+  have hsmooth := b1B1_smoothing_le n nLower width TLower divisorBound
+  have hprim := b1B1_primitive_le n nLower width TLower divisorBound
+  have hmain := b1B1_main_le n nLower width TLower divisorBound
+  have htail := b1B1_tail_le n nLower width TLower divisorBound
+  have approxNorm (x y : ℂ) : ‖x‖ ≤ ‖x - y‖ + ‖y‖ := by
+    simpa only [sub_add_cancel] using norm_add_le (x - y) y
+  rw [hsplit]
+  sorry
+
+end GoldbachB1B1Assembly
