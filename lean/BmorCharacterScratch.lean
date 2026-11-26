@@ -186,4 +186,37 @@ theorem bmor_of_average
   letI : NeZero q := ⟨by omega⟩
   exact average_twist_budget a n hcop _ (H q n hq hq' hn)
 
+
+/- BMOR, Definition 2.8, p. 441:
+   exact antiderivative of the zero-counting upper envelope divided by t².
+   This calculus identity has no analytic number theory hypotheses. -/
+noncomputable def zeroCountPrimitive (d t : ℝ) : ℝ :=
+  (Real.log (d*t/(2*Real.pi*Real.exp 1)))^2/(2*Real.pi) -
+    ((399/1000 : ℝ)*Real.log (Real.exp 1*d*t) + (5338/1000 : ℝ))/t
+
+theorem zeroCountPrimitive_hasDerivAt (d t : ℝ) (hd : 0 < d) (ht : 0 < t) :
+    HasDerivAt (zeroCountPrimitive d)
+      ((t/Real.pi * Real.log (d*t/(2*Real.pi*Real.exp 1)) +
+        (399/1000 : ℝ)*Real.log (d*t) + (5338/1000 : ℝ))/t^2) t := by
+  have hp : 0 < Real.pi := Real.pi_pos
+  have he : 0 < Real.exp 1 := Real.exp_pos _
+  have hA : HasDerivAt (fun x : ℝ => d*x/(2*Real.pi*Real.exp 1))
+      (d/(2*Real.pi*Real.exp 1)) t := by
+    simpa using ((hasDerivAt_id t).const_mul d).div_const (2*Real.pi*Real.exp 1)
+  have hB : HasDerivAt (fun x : ℝ => Real.exp 1*d*x)
+      (Real.exp 1*d) t := by
+    simpa using (hasDerivAt_id t).const_mul (Real.exp 1*d)
+  have hLA := hA.log (by positivity)
+  have hLB := hB.log (by positivity)
+  have hh := ((hLA.pow 2).div_const (2*Real.pi)).sub
+    (((hLB.const_mul (399/1000 : ℝ)).add_const (5338/1000 : ℝ)).div
+      (hasDerivAt_id t) ht.ne')
+  unfold zeroCountPrimitive
+  convert hh using 1
+  simp only [id_eq]
+  rw [show Real.exp 1*d*t = Real.exp 1*(d*t) by ring,
+    Real.log_mul he.ne' (mul_pos hd ht).ne', Real.log_exp]
+  field_simp
+  <;> ring
+
 end BmorScratch
