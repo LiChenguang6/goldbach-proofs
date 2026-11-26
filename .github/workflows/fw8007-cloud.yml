@@ -1,5 +1,9 @@
 name: Isolated FW-8007 Lean check
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lean/PEqualNP/Outside/L_goldbach_factor_line_fiber_determinant.lean'
   push:
     branches: [test/lean-fw8007-cloud]
     paths:
