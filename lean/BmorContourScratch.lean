@@ -3281,7 +3281,9 @@ theorem finite_rectangle_twist_error {q : ℕ} [NeZero q]
     rw [norm_mul, Complex.norm_natCast]
     exact (mul_le_mul_of_nonneg_left hb (Nat.cast_nonneg _)).trans_eq (by ring)
   have hres : ‖rectangleBoundary a 2 u v F / (2 * Real.pi * I) -
-      (if χ = 1 then (X:ℂ) + 1/2 else 0)‖ ≤ _ := by
+      (if χ = 1 then (X:ℂ) + 1/2 else 0)‖ ≤
+      ∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℝ) *
+        ((X:ℝ)+1)^z.re / ‖z‖ := by
     rw [hrect, mul_div_cancel_left₀ _ hc, sub_sub_cancel_left, norm_neg]
     exact hsum
   have hsharp := unit_perron_line_integral χ X hX
