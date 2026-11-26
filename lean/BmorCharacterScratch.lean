@@ -1389,4 +1389,199 @@ theorem perron_integratedTwist {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ
     have hkn : ¬ k ≤ n := fun h => hk (Finset.mem_range_succ_iff.mpr h)
     simp [hkn]
 
+
+/- Two frozen targets share the BMOR analytic bound.  The reduction below
+   retains the exact original theta statement (and proves a stronger
+   assertion without its upper cutoff).  It is conditional until the
+   frozen psi estimate itself is proved. -/
+noncomputable def thetaAP (q a n : ℕ) : ℝ :=
+  ∑ k ∈ (Finset.range (n+1)).filter (fun k => k % q = a % q),
+    if k.Prime then ArithmeticFunction.vonMangoldt k else 0
+
+theorem higherMass_bound (n : ℕ) (hn : 10^16 ≤ n) :
+    (∑ k ∈ Finset.range (n+1),
+      if k.Prime then 0 else ArithmeticFunction.vonMangoldt k) ≤ (n:ℝ)/1000 := by
+  have hI : Finset.Icc 0 n = Finset.range (n+1) := by
+    ext k
+    simp only [Finset.mem_Icc, Finset.mem_range, Nat.zero_le, true_and]
+    omega
+  have he : (∑ k ∈ Finset.range (n+1),
+      if k.Prime then 0 else ArithmeticFunction.vonMangoldt k) =
+      Chebyshev.psi (n:ℝ) - Chebyshev.theta (n:ℝ) := by
+    rw [Chebyshev.psi_eq_sum_Icc, Chebyshev.theta_eq_sum_Icc, Nat.floor_natCast, hI,
+      Finset.sum_filter, ← Finset.sum_sub_distrib]
+    apply Finset.sum_congr rfl
+    intro k hk
+    by_cases hp : k.Prime
+    · simp [hp, ArithmeticFunction.vonMangoldt_apply_prime hp]
+    · simp [hp]
+  rw [he]
+  have hn' : (10^16:ℝ) ≤ (n:ℝ) := by exact_mod_cast hn
+  have hx : 0 < (n:ℝ) := by linarith
+  let u := (n:ℝ)^(1/4:ℝ)
+  have hu : 0 < u := Real.rpow_pos_of_pos hx _
+  have hu4 : u^4 = (n:ℝ) := by
+    unfold u
+    rw [← Real.rpow_natCast, ← Real.rpow_mul hx.le]
+    norm_num
+  have hu2 : u^2 = Real.sqrt (n:ℝ) := by
+    unfold u
+    rw [Real.sqrt_eq_rpow, ← Real.rpow_natCast, ← Real.rpow_mul hx.le]
+    norm_num
+  have hU : 10000 ≤ u := by
+    by_contra! h
+    have h4 : u^4 < (10000:ℝ)^4 := by gcongr
+    norm_num at h4 hn'
+    linarith
+  have hlog : Real.log (n:ℝ) ≤ 4*u := by
+    have h := Real.log_le_rpow_div hx.le (by norm_num : (0:ℝ) < 1/4)
+    change Real.log (n:ℝ) ≤ u/(1/4:ℝ) at h
+    linarith
+  have hbound := Chebyshev.psi_sub_theta_le (x := (n:ℝ)) (by linarith)
+  calc
+    _ ≤ 2*Real.sqrt (n:ℝ)*Real.log (n:ℝ) := hbound
+    _ ≤ 2*u^2*(4*u) := by rw [← hu2]; gcongr
+    _ = 8*u^3 := by ring
+    _ ≤ u^4/1000 := by
+      have hh := mul_le_mul_of_nonneg_right (show (8000:ℝ) ≤ u by linarith)
+        (show 0 ≤ u^3 by positivity)
+      nlinarith only [hh]
+    _ = _ := by rw [hu4]
+
+theorem psiAP_sub_thetaAP (q a n : ℕ) :
+    psiAP q a n - thetaAP q a n =
+      ∑ k ∈ (Finset.range (n+1)).filter (fun k => k % q = a % q),
+        if k.Prime then 0 else ArithmeticFunction.vonMangoldt k := by
+  unfold psiAP thetaAP
+  rw [← Finset.sum_sub_distrib]
+  apply Finset.sum_congr rfl
+  intro k hk
+  split_ifs <;> simp
+
+theorem thetaAP_of_psiAP_bound (q a n : ℕ) (hn : 10^16 ≤ n)
+    (H : |psiAP q a n - (n:ℝ)/q.totient| ≤ (n:ℝ)/(840*Real.log (n:ℝ))) :
+    |thetaAP q a n - (n:ℝ)/q.totient| ≤ (n:ℝ)/450 := by
+  have h := higherMass_bound n hn
+  have hd : 0 ≤ psiAP q a n - thetaAP q a n := by
+    rw [psiAP_sub_thetaAP]
+    exact Finset.sum_nonneg (fun k _ => by split_ifs <;> positivity)
+  have hd' : psiAP q a n - thetaAP q a n ≤ (n:ℝ)/1000 := by
+    rw [psiAP_sub_thetaAP]
+    exact (Finset.sum_le_sum_of_subset_of_nonneg (Finset.filter_subset _ _)
+      (fun k _ _ => by split_ifs <;> positivity)).trans h
+  have hn' : (10^16:ℝ) ≤ (n:ℝ) := by exact_mod_cast hn
+  have hlog : 1 ≤ Real.log (n:ℝ) := by
+    calc
+      1 = Real.log (Real.exp 1) := (Real.log_exp 1).symm
+      _ ≤ _ := Real.log_le_log (Real.exp_pos _)
+        (by linarith [Real.exp_one_lt_three])
+  have hH : |psiAP q a n - (n:ℝ)/q.totient| ≤ (n:ℝ)/840 :=
+    H.trans (div_le_div_of_nonneg_left (by positivity) (by norm_num)
+      (by linarith))
+  apply abs_le.mpr
+  obtain ⟨hl, hr⟩ := abs_le.mp hH
+  constructor <;> linarith only [hl, hr, hd, hd', hn']
+
+theorem thetaAP_mod_four_odd (n : ℕ) :
+    thetaAP 2 1 n = thetaAP 4 1 n + thetaAP 4 3 n := by
+  unfold thetaAP
+  simp only [Finset.sum_filter]
+  rw [← Finset.sum_add_distrib]
+  apply Finset.sum_congr rfl
+  intro k hk
+  have hmod : k % 2 = 1 ↔ k % 4 = 1 ∨ k % 4 = 3 := by omega
+  simp only [Nat.reduceMod]
+  by_cases h1 : k % 4 = 1
+  · have h2 : k % 2 = 1 := hmod.mpr (Or.inl h1)
+    have h3 : k % 4 ≠ 3 := by omega
+    simp [h1,h2,h3]
+  · by_cases h3 : k % 4 = 3
+    · have h2 : k % 2 = 1 := hmod.mpr (Or.inr h3)
+      simp [h1,h2,h3]
+    · have h2 : k % 2 ≠ 1 := fun h => (hmod.mp h).elim h1 h3
+      simp [h1,h2,h3]
+
+theorem thetaAP_mod_one (n : ℕ) (hn : 2 ≤ n) :
+    thetaAP 1 0 n = thetaAP 2 1 n + Real.log 2 := by
+  unfold thetaAP
+  simp only [Finset.sum_filter, Nat.mod_one, Nat.reduceMod, ite_true]
+  have hsum : (∑ k ∈ Finset.range (n+1),
+      if k.Prime then ArithmeticFunction.vonMangoldt k else 0) =
+      ∑ k ∈ Finset.range (n+1),
+        ((if k % 2 = 1 then (if k.Prime then ArithmeticFunction.vonMangoldt k else 0) else 0) +
+          if k = 2 then Real.log 2 else 0) := by
+    apply Finset.sum_congr rfl
+    intro k hk
+    by_cases hp : k.Prime
+    · rcases hp.eq_two_or_odd with rfl | ho
+      · norm_num [ArithmeticFunction.vonMangoldt_apply_prime Nat.prime_two, Nat.prime_two]
+      · have hne : k ≠ 2 := by omega
+        simp [hp,ho,hne]
+    · have hne : k ≠ 2 := fun h => hp (h ▸ Nat.prime_two)
+      simp [hp,hne]
+  rw [hsum, Finset.sum_add_distrib]
+  simp [show 2 ∈ Finset.range (n+1) by
+    exact Finset.mem_range.mpr (by omega)]
+
+/-- Exact reduction of the second still-open frozen goal to the first.
+    The only hypothesis is the full, original psi frozen proposition. -/
+theorem theta_frozen_of_bmor
+    (H : ∀ (q a n : ℕ), 3 ≤ q → q ≤ 105 → a < q → Nat.Coprime a q →
+      8000000000 ≤ n → |(∑ k ∈ (Finset.range (n+1)).filter
+        (fun k => k % q = a % q), ArithmeticFunction.vonMangoldt k) -
+        (n:ℝ)/Nat.totient q| ≤ (n:ℝ)/(840 * Real.log (n:ℝ))) :
+    ∀ (q a n : ℕ), 1 ≤ q → q ≤ 105 → Nat.Coprime a q → 10^16 ≤ n →
+      (n:ℝ) < Real.exp (Real.exp (19/5)) →
+      |(∑ k ∈ (Finset.range (n+1)).filter (fun k => k % q = a % q),
+        (if k.Prime then ArithmeticFunction.vonMangoldt k else 0)) -
+        (n:ℝ)/Nat.totient q| ≤ (n:ℝ)/200 := by
+  intro q a n hq hq' hcop hn _
+  change |thetaAP q a n - (n:ℝ)/q.totient| ≤ (n:ℝ)/200
+  have hn' : (10^16:ℝ) ≤ (n:ℝ) := by exact_mod_cast hn
+  have hsmall (r b : ℕ) (hr : 3 ≤ r) (hr' : r ≤ 105) (hb : b < r)
+      (hc : Nat.Coprime b r) :
+      |thetaAP r b n - (n:ℝ)/r.totient| ≤ (n:ℝ)/450 :=
+    thetaAP_of_psiAP_bound r b n hn (H r b n hr hr' hb hc (by omega))
+  have h41 := hsmall 4 1 (by decide) (by decide) (by decide) (by decide)
+  have h43 := hsmall 4 3 (by decide) (by decide) (by decide) (by decide)
+  have htot4 : Nat.totient 4 = 2 := by decide
+  rw [htot4] at h41 h43
+  have h2 : |thetaAP 2 1 n - (n:ℝ)| ≤ (n:ℝ)/225 := by
+    rw [thetaAP_mod_four_odd]
+    obtain ⟨hl1,hr1⟩ := abs_le.mp h41
+    obtain ⟨hl3,hr3⟩ := abs_le.mp h43
+    push_cast at hl1 hr1 hl3 hr3
+    apply abs_le.mpr
+    constructor <;> linarith only [hl1,hr1,hl3,hr3]
+  by_cases hq1 : q = 1
+  · subst q
+    have hEq : thetaAP 1 a n = thetaAP 1 0 n := by simp [thetaAP]
+    rw [hEq, thetaAP_mod_one n (by omega)]
+    have htot : Nat.totient 1 = 1 := by decide
+    rw [htot]
+    norm_num
+    obtain ⟨hl,hr⟩ := abs_le.mp h2
+    apply abs_le.mpr
+    have hlog2 : 0 ≤ Real.log 2 := Real.log_nonneg (by norm_num)
+    have hlog2' : Real.log 2 ≤ 1 := by linarith [Real.log_two_lt_d9]
+    constructor <;> linarith only [hl,hr,hlog2,hlog2',hn']
+  by_cases hq2 : q = 2
+  · subst q
+    have ha : a % 2 = 1 := by
+      obtain ⟨m, hm⟩ := hcop.odd_of_right
+      omega
+    have he : thetaAP 2 a n = thetaAP 2 1 n := by
+      simp [thetaAP,ha]
+    rw [he, show Nat.totient 2 = 1 by decide]
+    norm_num
+    exact h2.trans (by linarith)
+  have hq3 : 3 ≤ q := by omega
+  have hred : Nat.Coprime (a%q) q := by
+    simpa using hcop
+  have hEq : thetaAP q a n = thetaAP q (a%q) n := by
+    simp [thetaAP, Nat.mod_mod]
+  rw [hEq]
+  exact (hsmall q (a%q) hq3 hq' (Nat.mod_lt _ (by omega)) hred).trans
+    (by linarith)
+
 end BmorScratch
