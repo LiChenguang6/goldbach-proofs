@@ -8237,12 +8237,9 @@ theorem b1B1_smoothing_le_aux (n : ℕ) (nLower : 2 ≤ n)
     simp [GoldbachB1B1Assembly.b1B1_exactNearPair,
       GoldbachB1B1Assembly.b1B1_smoothedNearPair]
   rw [h]
-  simp
+  rw [norm_zero]
   unfold GoldbachB1B1Assembly.finalScale
-  exact mul_nonneg (mul_nonneg (mul_nonneg (by norm_num)
-      (pow_nonneg (zero_le_one.trans TLower) 5))
-      (pow_nonneg (zero_le_one.trans (one_le_logBudget n)) 7))
-    (Real.rpow_nonneg (Nat.cast_nonneg n) _)
+  positivity
 
 end GoldbachB1B1Smooth
 
