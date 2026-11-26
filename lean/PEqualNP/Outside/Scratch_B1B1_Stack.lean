@@ -6290,3 +6290,48 @@ theorem jdeep_eq (n : ℕ) (u v : ℕ → ℝ) :
 end
 
 end GoldbachB1B1
+
+namespace GoldbachB1B1Adapt
+
+open GoldbachB1B1Scale
+open DyadicMixedB4ArcGeometry
+open DyadicMixedB4Geometric
+
+/-- b1-b1 截断下 M = stepLow, B = Q₁, H = H, R = cutoffR。
+    调用 Port 的 `window_empty_of_small_modulus`：小模数 q ≤ R 时窗口为空。 -/
+theorem b1B1_window_empty_small_modulus {n q : ℕ} (hn : 2 ≤ n) (hq : 0 < q)
+    (qBound : q ≤ b1B1_cutoffR n) :
+    window n (b1B1_stepLow n) (b1B1_Q1 n) (b1B1_H n) q = ∅ := by
+  have nPositive : 0 < n := by omega
+  have nReal : (1 : ℝ) ≤ n := by
+    have h : (2 : ℝ) ≤ n := by exact_mod_cast hn
+    linarith
+  have RBound : b1B1_cutoffR n ≤ b1B1_Q1 n :=
+    Nat.floor_mono (Real.rpow_le_rpow_of_exponent_le nReal (by norm_num))
+  have cover : (b1B1_cutoffR n : ℝ) * (n : ℝ) * radius (b1B1_stepLow n) ≤
+      (b1B1_H n : ℝ) := by
+    have h := b1B1_cover hn
+    simpa [b1B1_radiusLow, radius] using h
+  exact window_empty_of_small_modulus nPositive hq qBound RBound cover
+
+/-- b1-b1 下 `b = radius(stepLow n)`，调用 Port 的 `awayBound` 估计两波在网格邻域
+    补集上的模长积分。 -/
+theorem b1B1_awayBound_low {n u v l r k s : ℕ} (hn : 1 ≤ n)
+    (hu : 0 < u) (hv : 0 < v) (hun : u ≤ n) (hvn : v ≤ n)
+    (hr : r ≤ n / u) (hs : s ≤ n / v) :
+    (∫ t in (0 : ℝ)..1,
+      (gridNear (radius (b1B1_stepLow n)) (u.gcd v))ᶜ.indicator
+        (fun x => ‖wave u l r x * wave v k s x‖) t) ≤
+    128 * ((1 + Real.log ((n : ℝ) + 2)) ^ 2 +
+      (u.gcd v : ℝ) / ((u : ℝ) * (v : ℝ) * radius (b1B1_stepLow n))) := by
+  have nReal : (1 : ℝ) ≤ n := by exact_mod_cast hn
+  have hMPos : 0 < b1B1_stepLow n := by
+    have h1 : 1 ≤ b1B1_stepLow n :=
+      Nat.le_floor (Real.one_le_rpow nReal (by norm_num))
+    omega
+  have hb : 0 < radius (b1B1_stepLow n) := by
+    unfold radius
+    positivity
+  exact awayBound n u v l r k s (radius (b1B1_stepLow n)) hb hu hv hun hvn hr hs
+
+end GoldbachB1B1Adapt
