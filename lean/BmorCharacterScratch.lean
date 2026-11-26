@@ -280,4 +280,86 @@ theorem zeroCount_endpoint_identity (d H : ℝ) (hd : 0 < d) (hH : 0 < H) :
   field_simp
   <;> ring
 
+
+/- Discrete-to-continuous bridge for BMOR (2.11).
+   A finite indexing type permits repeated heights (zero multiplicities).
+   Strict counts under the integral avoid ambiguity at jump points. -/
+theorem inverseSquare_integrable (a b : ℝ) (ha : 0 < a) (hab : a ≤ b) :
+    IntervalIntegrable (fun t : ℝ => 1/t^2) MeasureTheory.volume a b := by
+  apply ContinuousOn.intervalIntegrable
+  intro t ht
+  rw [Set.uIcc_of_le hab] at ht
+  have hp : 0 < t := ha.trans_le ht.1
+  apply ContinuousAt.continuousWithinAt
+  fun_prop (disch := positivity)
+
+theorem inverseSquare_integral (a b : ℝ) (ha : 0 < a) (hab : a ≤ b) :
+    (∫ t in a..b, 1/t^2) = 1/a - 1/b := by
+  have hzero : (0 : ℝ) ∉ Set.uIcc a b := by
+    rw [Set.uIcc_of_le hab]
+    exact fun h => (not_le_of_gt ha) h.1
+  have h := intervalIntegral.integral_zpow (a := a) (b := b) (n := -2)
+    (Or.inr ⟨by decide, hzero⟩)
+  simpa [zpow_neg, one_div, neg_sub] using h
+
+theorem inverseSquare_step_integral (a b h : ℝ) (ha : 0 < a)
+    (hah : a ≤ h) (hhb : h ≤ b) :
+    (∫ t in a..b, (1/t^2) - (Set.Iic h).indicator (fun t => 1/t^2) t) =
+      1/h - 1/b := by
+  have hab := hah.trans hhb
+  have hbase := inverseSquare_integrable a b ha hab
+  have hind : IntervalIntegrable ((Set.Iic h).indicator (fun t : ℝ => 1/t^2))
+      MeasureTheory.volume a b := by
+    apply intervalIntegrable_iff.mpr
+    exact hbase.def'.integrable.indicator measurableSet_Iic
+  rw [intervalIntegral.integral_sub hbase hind]
+  rw [intervalIntegral.integral_indicator (f := fun t : ℝ => 1/t^2) ⟨hah, hhb⟩]
+  rw [inverseSquare_integral a b ha hab, inverseSquare_integral a h ha hah]
+  ring
+
+theorem finite_band_partial_summation {ι : Type*} (s : Finset ι) (h : ι → ℝ)
+    (a b : ℝ) (ha : 0 < a) (hab : a ≤ b)
+    (hh : ∀ i ∈ s, a ≤ h i ∧ h i ≤ b) :
+    (∑ i ∈ s, 1/h i) =
+      (s.card : ℝ)/b +
+        ∫ t in a..b, ∑ i ∈ s, ((1/t^2) -
+          (Set.Iic (h i)).indicator (fun t : ℝ => 1/t^2) t) := by
+  classical
+  have hbase := inverseSquare_integrable a b ha hab
+  have hint (i : ι) (_hi : i ∈ s) :
+      IntervalIntegrable (fun t : ℝ => 1/t^2 -
+        (Set.Iic (h i)).indicator (fun t : ℝ => 1/t^2) t)
+        MeasureTheory.volume a b := by
+    apply hbase.sub
+    apply intervalIntegrable_iff.mpr
+    exact hbase.def'.integrable.indicator measurableSet_Iic
+  rw [intervalIntegral.integral_finsetSum hint]
+  have heq : (∑ i ∈ s, ∫ t in a..b, 1/t^2 -
+        (Set.Iic (h i)).indicator (fun t : ℝ => 1/t^2) t) =
+      ∑ i ∈ s, (1/h i - 1/b) := by
+    apply Finset.sum_congr rfl
+    intro i hi
+    exact inverseSquare_step_integral a b (h i) ha (hh i hi).1 (hh i hi).2
+  rw [heq, Finset.sum_sub_distrib]
+  simp only [Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv, one_mul]
+  ring
+
+/-- Equation (2.11), once partial summation and the zero-count upper bound
+    are instantiated for the actual multiset of Dirichlet L-function zeros.
+    The zero-count estimate is still an analytic hypothesis. -/
+theorem zeroCount_partialSummation_bound (d a b : ℝ) (hd : 0 < d)
+    (ha : 0 < a) (hab : a ≤ b) (N : ℝ → ℝ) (S : ℝ)
+    (hN : ∀ t ∈ Set.Icc a b, N t ≤ zeroCountUpper d t)
+    (hint : IntervalIntegrable (fun t => N t/t^2) MeasureTheory.volume a b)
+    (hPS : S = N b/b - N a/a + ∫ t in a..b, N t/t^2) :
+    S ≤ -N a/a - zeroCountPrimitive d a +
+      (Real.log (d*b/(2*Real.pi)))^2/(2*Real.pi) -
+      1/(2*Real.pi) - (399/1000 : ℝ)/b := by
+  have hb : 0 < b := ha.trans_le hab
+  have h1 := div_le_div_of_nonneg_right (hN b ⟨hab, le_rfl⟩) hb.le
+  have h2 := zeroCount_weighted_budget d a b hd ha hab N hN hint
+  have h3 := zeroCount_endpoint_identity d b hd hb
+  rw [hPS]
+  linarith
+
 end BmorScratch
