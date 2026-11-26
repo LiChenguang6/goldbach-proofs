@@ -3300,3 +3300,249 @@ theorem finite_rectangle_twist_error {q : ℕ} [NeZero q]
   · exact le_max_right _ _
 
 end BmorContourScratch
+
+
+/- Adapt the Jensen disk argument credited to upstream PR #46: its geometry
+   only requires Re rho >= 1/2, not GRH. This is a genuinely weaker input
+   than the original critical-line window estimate. -/
+namespace GoldbachProgression
+
+open Finset Filter Set MeasureTheory Complex Asymptotics DirichletCharacter
+open scoped BigOperators Classical Topology
+
+theorem rightHalf_window_multiplicity_le_of_circle_bound (f : ℂ → ℂ) (t M : ℝ) (Z : Finset ℂ)
+    (hZ : ∀ z ∈ Z, 1 / 2 ≤ z.re ∧ z.re ≤ 1 ∧ |z.im - t| ≤ 1)
+    (hf : AnalyticOnNhd ℂ f (closedBall (⟨3, t⟩ : ℂ) (23 / 8)))
+    (hcenter : f (⟨3, t⟩ : ℂ) ≠ 0) (hM : 1 ≤ M)
+    (hbound : ∀ z ∈ sphere (⟨3, t⟩ : ℂ) (23 / 8), ‖f z‖ ≤ M) :
+    (∑ z ∈ Z, (analyticOrderNatAt f z : ℤ) : ℤ) ≤
+      Real.log (M / ‖f (⟨3, t⟩ : ℂ)‖) / Real.log (23 / 22) := by
+  classical
+  let c : ℂ := ⟨3, t⟩
+  let r : ℝ := 11 / 4
+  let R : ℝ := 23 / 8
+  have hr : 0 < r := by norm_num [r]
+  have hR : 0 < R := by norm_num [R]
+  have hrR : r < R := by norm_num [r, R]
+  have han : AnalyticOnNhd ℂ f (closedBall c r) := hf.mono (closedBall_subset_closedBall hrR.le)
+  have hmem (z : ℂ) (hz : z ∈ Z) : z ∈ closedBall c r := by
+    obtain ⟨hre, hre', him⟩ := hZ z hz
+    have hreal : (z.re - 3)^2 ≤ (5/2:ℝ)^2 := sq_le_sq' (by linarith) (by linarith)
+    have hs := sq_le_sq' (abs_le.mp him).1 (abs_le.mp him).2
+    rw [mem_closedBall, dist_eq_norm]
+    have heq := Complex.sq_norm_sub_sq_re (z - c)
+    simp only [Complex.sub_re, Complex.sub_im, c] at heq
+    dsimp [r]
+    nlinarith
+  let d := divisor f (closedBall c r)
+  have hd (z : ℂ) (hz : z ∈ Z) : (analyticOrderNatAt f z : ℤ) = d z := by
+    change _ = divisor f (closedBall c r) z
+    rw [han.divisor_apply (hmem z hz)]
+    unfold analyticOrderNatAt
+    cases h : analyticOrderAt f z using ENat.recTopCoe <;> simp
+  have hsupp := d.finiteSupport (isCompact_closedBall c r)
+  let U := Z ∪ hsupp.toFinset
+  have hu : Function.support d ⊆ (U : Set ℂ) := by
+    intro z hz
+    exact Finset.mem_union_right _ (hsupp.mem_toFinset.mpr hz)
+  have hsum : (∑ z ∈ Z, (analyticOrderNatAt f z : ℤ)) ≤ ∑ᶠ z, d z := by
+    rw [finsum_eq_sum_of_support_subset _ hu]
+    calc
+      _ = ∑ z ∈ Z, d z := Finset.sum_congr rfl hd
+      _ ≤ _ := Finset.sum_le_sum_of_subset_of_nonneg Finset.subset_union_left
+        (fun z _ _ => han.divisor_nonneg z)
+  have hj := AnalyticOnNhd.sum_divisor_le (c := c) (r := r) (R := R) (M := M)
+    (by simpa only [abs_of_pos hr] using hr) (by simpa only [abs_of_pos hr, abs_of_pos hR] using hrR)
+    hM (by simpa only [abs_of_pos hR] using hf) hcenter
+    (by simpa only [abs_of_pos hR] using hbound)
+  have hratio : R / r = 23 / 22 := by norm_num [R,r]
+  rw [abs_of_pos hr, hratio] at hj
+  exact le_trans (by exact_mod_cast hsum) hj
+
+theorem rightHalf_nonprincipal_character_window_count {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) (t : ℝ) (Z : Finset ℂ)
+    (hZ : ∀ z ∈ Z, 1 / 2 ≤ z.re ∧ z.re < 1 ∧ χ.LFunction z = 0 ∧ |z.im - t| ≤ 1) :
+    (∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℝ)) ≤
+      (8 / Real.log (23 / 22)) * Real.log ((q : ℝ) * (2 + |t|)) := by
+  let c : ℂ := ⟨3, t⟩
+  let U : ℝ := (q : ℝ) * (2 + |t|)
+  let M := 64 * U
+  have hq : 1 ≤ (q : ℝ) := by exact_mod_cast (show 1 ≤ q from q.pos_of_neZero)
+  have hU : 2 ≤ U := calc
+    (2 : ℝ) ≤ 2 + |t| := le_add_of_nonneg_right (abs_nonneg _)
+    _ ≤ U := le_mul_of_one_le_left (by positivity) hq
+  have hUpos : 0 < U := by linarith
+  have hM : 1 ≤ M := by dsimp only [M]; linarith
+  have hc : ‖c‖ ≤ 3 + |t| := by
+    simpa [c] using Complex.norm_le_abs_re_add_abs_im c
+  have hbound (z : ℂ) (hz : z ∈ sphere c (23 / 8)) : ‖χ.LFunction z‖ ≤ M := by
+    have hdist : ‖z - c‖ = 23 / 8 := by simpa only [mem_sphere, dist_eq_norm] using hz
+    have hre : |z.re - 3| ≤ 23 / 8 := by
+      simpa only [Complex.sub_re, hdist, c] using Complex.abs_re_le_norm (z - c)
+    have hl := (abs_le.mp hre).1
+    have hzNorm : ‖z‖ ≤ 23 / 8 + (3 + |t|) := by
+      calc ‖z‖ ≤ ‖z - c‖ + ‖c‖ := norm_le_norm_sub_add _ _
+           _ ≤ _ := by rw [hdist]; linarith
+    calc
+      _ ≤ 16 * (q : ℝ) * ‖z‖ := nonprincipal_LFunction_norm_le_on_strip χ hχ z (by linarith)
+      _ ≤ 16 * (q : ℝ) * (4 * (2 + |t|)) :=
+        mul_le_mul_of_nonneg_left (by linarith [abs_nonneg t]) (by positivity)
+      _ = M := by dsimp only [M, U]; ring
+  have hlower : 1 / 2 ≤ ‖χ.LFunction c‖ := half_le_norm_LFunction_of_re_eq_three χ rfl
+  have hcenter : 0 < ‖χ.LFunction c‖ := by linarith
+  have hj := rightHalf_window_multiplicity_le_of_circle_bound χ.LFunction t M Z
+    (fun z hz => ⟨(hZ z hz).1, (hZ z hz).2.1.le, (hZ z hz).2.2.2⟩)
+    (fun z _ => (DirichletCharacter.differentiable_LFunction hχ).analyticAt z)
+    (norm_pos_iff.mp hcenter) hM hbound
+  have hratio : M / ‖χ.LFunction c‖ ≤ 128 * U := by
+    apply (div_le_iff₀ hcenter).2
+    calc
+      M = 128 * U * (1 / 2) := by dsimp only [M]; ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left hlower (by positivity)
+  have hlog : Real.log (M / ‖χ.LFunction c‖) ≤ 8 * Real.log U := by
+    calc
+      _ ≤ Real.log (128 * U) := Real.log_le_log (div_pos (by linarith) hcenter) hratio
+      _ = 7 * Real.log 2 + Real.log U := by
+        rw [show (128 : ℝ) = 2 ^ 7 by norm_num, Real.log_mul (by norm_num) hUpos.ne', Real.log_pow]
+        norm_num
+      _ ≤ _ := by linarith [Real.log_le_log (by norm_num : (0 : ℝ) < 2) hU]
+  have hden : 0 < Real.log (23 / 22) := Real.log_pos (by norm_num)
+  calc
+    _ ≤ Real.log (M / ‖χ.LFunction c‖) / Real.log (23 / 22) := by exact_mod_cast hj
+    _ ≤ (8 * Real.log U) / Real.log (23 / 22) := div_le_div_of_nonneg_right hlog hden.le
+    _ = _ := by dsimp only [U]; ring
+
+theorem rightHalf_zeta_window_multiplicity (t : ℝ) (Z : Finset ℂ)
+    (hZ : ∀ z ∈ Z, 1 / 2 ≤ z.re ∧ z.re < 1 ∧ riemannZeta z = 0 ∧ |z.im - t| ≤ 1) :
+    (∑ z ∈ Z, (analyticOrderNatAt riemannZeta z : ℝ)) ≤
+      (10 / Real.log (23 / 22)) * Real.log (2 + |t|) := by
+  let c : ℂ := ⟨3, t⟩
+  let U : ℝ := 2 + |t|
+  let M : ℝ := 256 * U^2
+  have hU : 2 ≤ U := le_add_of_nonneg_right (abs_nonneg t)
+  have hUpos : 0 < U := by linarith
+  have hM : 1 ≤ M := by dsimp only [M]; nlinarith [sq_nonneg (U-2)]
+  have hc : ‖c‖ ≤ 3 + |t| := by simpa [c] using Complex.norm_le_abs_re_add_abs_im c
+  have hbound (z : ℂ) (hz : z ∈ sphere c (23 / 8)) : ‖riemannZeta₁ z‖ ≤ M := by
+    have hdist : ‖z-c‖ = 23/8 := by simpa only [mem_sphere, dist_eq_norm] using hz
+    have hre : |z.re - 3| ≤ 23/8 := by
+      simpa only [Complex.sub_re, hdist, c] using Complex.abs_re_le_norm (z-c)
+    have hzN : 1 + ‖z‖ ≤ 4 * U := by
+      have h := norm_le_norm_sub_add z c
+      rw [hdist] at h
+      dsimp only [U]
+      linarith [abs_nonneg t]
+    calc
+      _ ≤ 9 * (1 + ‖z‖)^2 := zeta_pole_removed_norm_le_on_strip _ (by linarith [(abs_le.mp hre).1])
+      _ ≤ 9 * (4 * U)^2 := by gcongr
+      _ ≤ M := by dsimp only [M]; nlinarith [sq_nonneg U]
+  have hfac : 2 ≤ ‖c - 1‖ := by
+    convert Complex.abs_re_le_norm (c-1) using 1
+    norm_num [c]
+  have hζ : (1/2 : ℝ) ≤ ‖riemannZeta c‖ := by
+    simpa only [DirichletCharacter.LFunction_modOne_eq] using
+      (half_le_norm_LFunction_of_re_eq_three (1 : DirichletCharacter ℂ 1) (s := c) rfl)
+  have hcne : c ≠ 1 := by intro h; have := congrArg Complex.re h; norm_num [c] at this
+  have hcen : 1 ≤ ‖riemannZeta₁ c‖ := by
+    rw [regular_zeta_eq_mul hcne, norm_mul]
+    calc (1:ℝ) = 2 * (1/2) := by norm_num
+         _ ≤ _ := mul_le_mul hfac hζ (by norm_num) (norm_nonneg _)
+  have hcenpos : 0 < ‖riemannZeta₁ c‖ := zero_lt_one.trans_le hcen
+  have hj := rightHalf_window_multiplicity_le_of_circle_bound riemannZeta₁ t M Z
+    (fun z hz => ⟨(hZ z hz).1, (hZ z hz).2.1.le, (hZ z hz).2.2.2⟩)
+    (fun z _ => differentiable_riemannZeta₁.analyticAt z)
+    (norm_pos_iff.mp hcenpos) hM hbound
+  have hlog : Real.log (M / ‖riemannZeta₁ c‖) ≤ 10 * Real.log U := by
+    calc
+      _ ≤ Real.log M := Real.log_le_log (div_pos (by linarith) hcenpos) (div_le_self (by linarith) hcen)
+      _ = 8 * Real.log 2 + 2 * Real.log U := by
+        rw [show M = (2 : ℝ)^8 * U^2 by norm_num [M],
+          Real.log_mul (by norm_num) (pow_ne_zero _ hUpos.ne'), Real.log_pow, Real.log_pow]
+        norm_num
+      _ ≤ _ := by linarith [Real.log_le_log (by norm_num : (0 : ℝ) < 2) hU]
+  have hden : 0 < Real.log (23/22) := Real.log_pos (by norm_num)
+  calc
+    _ = ∑ z ∈ Z, (analyticOrderNatAt riemannZeta₁ z : ℝ) := by
+      apply Finset.sum_congr rfl
+      intro z hz
+      have hne : z ≠ 1 := by
+        intro h; have := (hZ z hz).2.1; simp [h] at this
+      rw [regular_zeta_order hne]
+    _ ≤ Real.log (M / ‖riemannZeta₁ c‖) / Real.log (23/22) := by exact_mod_cast hj
+    _ ≤ (10 * Real.log U) / Real.log (23/22) := div_le_div_of_nonneg_right hlog hden.le
+    _ = _ := by dsimp only [U]; ring
+
+theorem rightHalf_primitive_character_window_count {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hprim : χ.IsPrimitive) (t : ℝ) (Z : Finset ℂ)
+    (hZ : ∀ z ∈ Z, 1 / 2 ≤ z.re ∧ z.re < 1 ∧ χ.LFunction z = 0 ∧ |z.im - t| ≤ 1) :
+    (∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℝ)) ≤
+      (10 / Real.log (23 / 22)) * Real.log ((q : ℝ) * (2 + |t|)) := by
+  by_cases hχ : χ = 1
+  · subst χ
+    have h : (1 : DirichletCharacter ℂ q).conductor = q := hprim
+    have hq : q = 1 := by simpa only [DirichletCharacter.conductor_one] using h.symm
+    subst q
+    simp only [DirichletCharacter.LFunction_modOne_eq, Nat.cast_one, one_mul] at *
+    exact rightHalf_zeta_window_multiplicity t Z hZ
+  · apply (rightHalf_nonprincipal_character_window_count χ hχ t Z hZ).trans
+    have hq : 1 ≤ (q : ℝ) := by exact_mod_cast (show 1 ≤ q from q.pos_of_neZero)
+    have hlog : 0 ≤ Real.log ((q : ℝ) * (2 + |t|)) :=
+      Real.log_nonneg (one_le_mul_of_one_le_of_one_le hq (by linarith [abs_nonneg t]))
+    gcongr
+    norm_num
+
+/-- Explicit good height for every zero in the right half of the critical
+strip, without GRH and with multiplicities in the Jensen estimate. -/
+theorem rightHalf_primitive_good_height {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hprim : χ.IsPrimitive) (T : ℝ) :
+    ∃ t ∈ Set.Icc T (T+1), ∀ z : ℂ, 1/2 ≤ z.re → z.re < 1 →
+      χ.LFunction z = 0 →
+      1 / (3 * ((10 / Real.log (23/22)) *
+        Real.log ((q : ℝ) * (2 + |T + 1/2|)) + 1)) ≤ |t - z.im| := by
+  classical
+  let Z := (finite_character_zeros_in_window χ (T+1/2) 1).toFinset.filter
+    (fun z => 1/2 ≤ z.re)
+  let B := Z.image Complex.im
+  let W := (10 / Real.log (23/22)) * Real.log ((q : ℝ) * (2 + |T+1/2|))
+  have hZ (z : ℂ) (hz : z ∈ Z) :
+      1/2 ≤ z.re ∧ z.re < 1 ∧ χ.LFunction z = 0 ∧ |z.im-(T+1/2)| ≤ 1 := by
+    obtain ⟨hz',hre⟩ := Finset.mem_filter.mp hz
+    obtain ⟨_,h₁,hwin,hL⟩ :=
+      (finite_character_zeros_in_window χ (T+1/2) 1).mem_toFinset.mp hz'
+    exact ⟨hre,h₁,hL,hwin⟩
+  have hcard : (B.card : ℝ) ≤ W := calc
+    _ ≤ (Z.card : ℝ) := by exact_mod_cast Finset.card_image_le
+    _ = ∑ _z ∈ Z, (1 : ℝ) := by simp
+    _ ≤ ∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℝ) := by
+      apply Finset.sum_le_sum
+      intro z hz
+      obtain ⟨_,h₁,hL,_⟩ := hZ z hz
+      have hne : z ≠ 1 := by intro he; simp [he] at h₁
+      exact_mod_cast positive_multiplicity_of_character_zero χ hne hL
+    _ ≤ W := rightHalf_primitive_character_window_count χ hprim _ _ hZ
+  obtain ⟨t, ht, hsep⟩ := exists_height_avoiding B T
+  refine ⟨t,ht,?_⟩
+  intro z h₀ h₁ hL
+  have hc : 0 ≤ (B.card : ℝ) := Nat.cast_nonneg _
+  have hmono : 1 / (3 * (W+1)) ≤ 1 / (3 * (B.card+1 : ℝ)) :=
+    one_div_le_one_div_of_le (by positivity) (by linarith)
+  apply hmono.trans
+  by_cases hwin : |z.im - (T+1/2)| ≤ 1
+  · apply hsep
+    apply Finset.mem_image.mpr
+    refine ⟨z,Finset.mem_filter.mpr ⟨?_,h₀⟩,rfl⟩
+    exact (finite_character_zeros_in_window χ (T+1/2) 1).mem_toFinset.mpr
+      ⟨by linarith,h₁,hwin,hL⟩
+  · have hhalf : 1 / (3 * (B.card + 1 : ℝ)) ≤ 1 / 2 :=
+      one_div_le_one_div_of_le (by norm_num) (by linarith)
+    apply hhalf.trans
+    rw [abs_le] at hwin
+    rcases lt_or_ge (t-z.im) 0 with h | h
+    · rw [abs_of_neg h]
+      by_contra! hn
+      exact hwin ⟨by linarith [ht.1],by linarith [ht.2]⟩
+    · rw [abs_of_nonneg h]
+      by_contra! hn
+      exact hwin ⟨by linarith [ht.1],by linarith [ht.2]⟩
+
+end GoldbachProgression
