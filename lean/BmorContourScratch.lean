@@ -4271,7 +4271,7 @@ theorem principal_negLogDeriv_le_zeta {q : ℕ} [NeZero q]
     (-logDeriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q)) (σ:ℂ)).re ≤
       (-logDeriv riemannZeta (σ:ℂ)).re := by
   have hs : 1 < (σ:ℂ).re := hσ
-  simp only [logDeriv_apply,neg_div]
+  simp only [logDeriv_apply, ← neg_div]
   rw [← twistLSeries_eq_logDeriv _ _ hs,
     ← ArithmeticFunction.LSeries_vonMangoldt_eq_deriv_riemannZeta_div hs]
   have h1 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt
