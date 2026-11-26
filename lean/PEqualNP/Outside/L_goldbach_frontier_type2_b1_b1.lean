@@ -8459,23 +8459,25 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
     positivity
   have tailNonnegative : 0 ≤ tail :=
     sum_nonneg fun g _ => sum_nonneg fun d _ => sum_nonneg fun f _ =>
-      mul_nonneg (tailWeight_nonnegative _ _ _ _) (blockEnergy_nonnegative _ _ _ _)
+      mul_nonneg (tailWeight_nonnegative R g f d) (blockEnergy_nonnegative n A U g d)
   have each (i : ι) (iMember : i ∈ items) (q : ℕ) (qMember : q ∈ Q i) :
       ‖primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
         C / (step i : ℝ) * cost q := by
     obtain ⟨divisor, _rQ⟩ := mem_filter.mp qMember
+    have hsr := stepRange i iMember
+    have gPos : 0 < step i := (mem_Icc.mp hsr).1
+    have gLe : step i ≤ M := (mem_Icc.mp hsr).2
     have qPositive : 0 < q := Nat.pos_of_mem_divisors divisor
     have qBound : q ≤ M :=
-      (Nat.le_of_dvd (by have := (stepRange i iMember).1; omega)
-        (Nat.dvd_of_mem_divisors divisor)).trans (stepRange i iMember).2
+      (Nat.le_of_dvd gPos (Nat.dvd_of_mem_divisors divisor)).trans gLe
     exact norm_primitiveBlock_le n M B H q (step i) lo hi U A nPositive APositive
       qPositive qBound mN radiusUpper indices indexRange w TNonnegative wBound divisorBound
   refine (norm_sum_le _ _).trans ?_
   calc
     _ ≤ ∑ i ∈ items, weight i * ∑ q ∈ Q i, C / (step i : ℝ) * cost q := by
       refine sum_le_sum fun i iMember => ?_
-      have hwi : ‖weight i‖ = weight i := by
-        rw [Real.norm_eq_abs, abs_of_nonneg (weightNonneg i iMember)]
+      have hwi : ‖(weight i : ℂ)‖ = weight i := by
+        rw [Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg (weightNonneg i iMember)]
       rw [norm_mul, hwi]
       exact mul_le_mul_of_nonneg_left
         ((norm_sum_le _ _).trans (sum_le_sum (each i iMember)))
@@ -8486,14 +8488,16 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
       rw [← mul_sum]
       ring
     _ ≤ C * ((W * (1 + Real.log M)) * tail) := by
-      have mainBound := sum_weighted_moduli_le items step weight R M MPositive W WNonnegative
+      have mainBound := sum_weighted_moduli_le items step weight R M MPositive WNonnegative
         stepRange weightBound G D F
         (fun g hg => by have := (mem_Icc.mp hg).1; omega)
         (fun d hd => by have := (mem_Icc.mp hd).1; omega)
         (fun f hf => by have ⟨_, hn0⟩ := Nat.mem_divisors.mp hf; omega)
         energyNonneg
       exact mul_le_mul_of_nonneg_left mainBound CNonnegative
-    _ ≤ (40 * T ^ 2 * logBudget n) * ((W * logBudget n) * tailBound) := by
+    _ ≤ (40 * T ^ 2 * logBudget n) * ((W * logBudget n) *
+        (51200 * gcdSeriesConstant * T ^ 2 * logBudget n ^ 3 *
+          (n : ℝ) ^ (31 / 32 : ℝ))) := by
       have logPlus : Real.log ((n : ℝ) + 1) ≤ logBudget n := by
         have h1 : Real.log ((n : ℝ) + 1) ≤ Real.log ((n : ℝ) + 2) :=
           Real.log_le_log (by linarith) (by linarith)
