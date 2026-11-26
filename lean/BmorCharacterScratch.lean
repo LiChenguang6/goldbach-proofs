@@ -549,4 +549,140 @@ theorem primitive_centered_error_bound {q : ℕ} [NeZero q]
   rw [hh]
   exact (norm_sub_le _ _).trans (add_le_add hB (hd.trans hD))
 
+
+/- Elementary nonunit mass bound.  Adapted from Nature-UL's public proof
+   of L-goldbach-finite-fixed-nonunit-mangoldt, upstream PR #2444,
+   https://github.com/CGandGameEngineLearner/goldbach-proofs/pull/2444
+   (Apache-2.0). Included locally in the research file, not imported as
+   an undeclared external lemma or represented as a new platform proof. -/
+theorem nonunit_mangoldt_bound (q n : ℕ) (hq : 1 ≤ q) (hn : 1 ≤ n) :
+    (∑ k ∈ (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q),
+      ArithmeticFunction.vonMangoldt k) ≤ (q.primeFactors.card:ℝ)*Real.log n := by
+  classical
+  let M := ∏ p ∈ q.primeFactors, p ^ Nat.log p n
+  have hM : 0 < M := Finset.prod_pos fun p hp => pow_pos (Nat.prime_of_mem_primeFactors hp).pos _
+  let S := (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q)
+  have hsupport : S.filter (fun k => ArithmeticFunction.vonMangoldt k ≠ 0) ⊆ M.divisors := by
+    intro k hk
+    obtain ⟨hkS, hweight⟩ := Finset.mem_filter.mp hk
+    obtain ⟨hkrange, hnonunit⟩ := Finset.mem_filter.mp hkS
+    obtain ⟨p, j, hp, _, rfl⟩ := ArithmeticFunction.vonMangoldt_ne_zero_iff.mp hweight
+    have hprime := Nat.prime_iff.mpr hp
+    have hdvd : p ∣ q := by
+      by_contra h
+      exact hnonunit ((hprime.coprime_iff_not_dvd.mpr h).pow_left j)
+    have hpq := Nat.mem_primeFactors.mpr ⟨hprime, hdvd, Nat.ne_of_gt hq⟩
+    have hj : j ≤ Nat.log p n :=
+      Nat.le_log_of_pow_le hprime.one_lt (Finset.mem_range_succ_iff.mp hkrange)
+    exact Nat.mem_divisors.mpr ⟨(pow_dvd_pow p hj).trans
+      (Finset.dvd_prod_of_mem (fun r => r ^ Nat.log r n) hpq), hM.ne'⟩
+  have hbound : M ≤ n ^ q.primeFactors.card := by
+    calc
+      M ≤ ∏ _p ∈ q.primeFactors, n :=
+        Finset.prod_le_prod fun p _ => Nat.pow_log_le_self p (Nat.ne_of_gt hn)
+      _ = _ := Finset.prod_const n
+  change (∑ k ∈ S, ArithmeticFunction.vonMangoldt k) ≤ _
+  rw [← Finset.sum_filter_ne_zero (f := fun k => ArithmeticFunction.vonMangoldt k) S]
+  calc
+    _ ≤ ∑ k ∈ M.divisors, ArithmeticFunction.vonMangoldt k :=
+      Finset.sum_le_sum_of_subset_of_nonneg hsupport fun _ _ _ => ArithmeticFunction.vonMangoldt_nonneg
+    _ = Real.log M := ArithmeticFunction.vonMangoldt_sum
+    _ ≤ Real.log ((n ^ q.primeFactors.card : ℕ) : ℝ) :=
+      Real.log_le_log (by exact_mod_cast hM) (by exact_mod_cast hbound)
+    _ = _ := by rw [Nat.cast_pow, Real.log_pow]
+
+/-- A small, kernel-checked finite computation, with no native_decide. -/
+set_option maxRecDepth 10000 in
+set_option maxHeartbeats 2000000 in
+theorem small_modulus_primeFactor_card (q : ℕ) (hq : q ≤ 105) :
+    q.primeFactors.card ≤ 3 := by
+  have h : ∀ k : Fin 106, k.val.primeFactors.card ≤ 3 := by decide
+  exact h ⟨q, by omega⟩
+
+/-- For the frozen threshold, the correction 3 log x takes at most 1%
+    of x/(840 log x). The proof uses only elementary real inequalities. -/
+theorem nonunit_budget_real (x : ℝ) (hx : 8000000000 ≤ x) :
+    3 * Real.log x ≤ x/(84000 * Real.log x) := by
+  have hxpos : 0 < x := by linarith
+  have hlog : 0 < Real.log x := Real.log_pos (by linarith)
+  let u : ℝ := x^(1/8:ℝ)
+  have hu : 0 < u := Real.rpow_pos_of_pos hxpos _
+  have hu8 : u^8 = x := by
+    unfold u
+    rw [← Real.rpow_natCast, ← Real.rpow_mul hxpos.le]
+    norm_num
+  have hu16 : 16 ≤ u := by
+    by_contra! h
+    have h8 : u^8 < (16:ℝ)^8 := by gcongr
+    norm_num at h8
+    linarith
+  have hl : Real.log x ≤ 8*u := by
+    have h := Real.log_le_rpow_div hxpos.le (by norm_num : (0:ℝ)<1/8)
+    change Real.log x ≤ u/(1/8:ℝ) at h
+    linarith
+  have hl2 : (Real.log x)^2 ≤ (8*u)^2 := by
+    nlinarith [mul_nonneg (sub_nonneg.mpr hl)
+      (show 0 ≤ 8*u + Real.log x by positivity)]
+  have hu6 : (16:ℝ)^6 ≤ u^6 := by gcongr
+  have hb : (252000*64:ℝ) ≤ u^6 := by norm_num at hu6 ⊢; linarith
+  have hp := mul_le_mul_of_nonneg_right hb (sq_nonneg u)
+  have ht : (252000:ℝ)*(Real.log x)^2 ≤ x := by
+    calc
+      _ ≤ 252000*(8*u)^2 := mul_le_mul_of_nonneg_left hl2 (by norm_num)
+      _ = (252000*64:ℝ)*u^2 := by ring
+      _ ≤ u^6*u^2 := hp
+      _ = x := by rw [← pow_add, hu8]
+  apply (le_div_iff₀ (by positivity : 0 < 84000 * Real.log x)).2
+  nlinarith only [ht]
+
+theorem nonunit_small_modulus_budget (q n : ℕ) (hq : 1 ≤ q)
+    (hq' : q ≤ 105) (hn : 8000000000 ≤ n) :
+    (∑ k ∈ (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q),
+      ArithmeticFunction.vonMangoldt k) ≤ (n:ℝ)/(84000 * Real.log n) := by
+  have hc : (q.primeFactors.card:ℝ) ≤ 3 := by
+    exact_mod_cast small_modulus_primeFactor_card q hq'
+  have hn' : (8000000000:ℝ) ≤ (n:ℝ) := by exact_mod_cast hn
+  have hlog : 0 ≤ Real.log (n:ℝ) := Real.log_nonneg (by linarith)
+  exact (nonunit_mangoldt_bound q n hq (by omega)).trans
+    ((mul_le_mul_of_nonneg_right hc hlog).trans (nonunit_budget_real n hn'))
+
+/-- Reduce the frozen estimate to the primitive-character analytic budget
+    with a separately proved explicit allowance for changing modulus. -/
+theorem bmor_of_primitive_budget
+    (H : ∀ (q n : ℕ) [NeZero q], 3 ≤ q → q ≤ 105 → 8000000000 ≤ n →
+      (∑ χ : DirichletCharacter ℂ q, ‖psiTwist χ.primitiveCharacter n -
+        (if χ = 1 then (n : ℂ) else 0)‖) ≤
+          (q.totient : ℝ) * (99/100 * ((n:ℝ)/(840 * Real.log n)))) :
+    ∀ (q a n : ℕ), 3 ≤ q → q ≤ 105 → a < q → Nat.Coprime a q →
+      8000000000 ≤ n →
+      |(∑ k ∈ (Finset.range (n+1)).filter (fun k => k % q = a % q),
+        ArithmeticFunction.vonMangoldt k) - (n:ℝ)/Nat.totient q|
+        ≤ (n:ℝ)/(840 * Real.log (n:ℝ)) := by
+  classical
+  apply bmor_of_average
+  intro q n _ hq hq' hn
+  let D : ℝ := (n:ℝ)/(84000*Real.log n)
+  let B : ℝ := (n:ℝ)/(840*Real.log n)
+  have hD := nonunit_small_modulus_budget q n (by omega) hq' hn
+  have hcard : Fintype.card (DirichletCharacter ℂ q) = q.totient := by
+    rw [← Nat.card_eq_fintype_card]
+    exact DirichletCharacter.card_eq_totient_of_hasEnoughRootsOfUnity ℂ q
+  have hD' : D = B/100 := by
+    dsimp [D, B]
+    ring_nf
+  have hH := H q n hq hq' hn
+  change (∑ χ : DirichletCharacter ℂ q, ‖centeredTwist χ n‖) ≤ (q.totient:ℝ)*B
+  calc
+    _ ≤ ∑ χ : DirichletCharacter ℂ q, (‖psiTwist χ.primitiveCharacter n -
+        (if χ = 1 then (n:ℂ) else 0)‖ + D) := by
+      apply Finset.sum_le_sum
+      intro χ hχ
+      exact primitive_centered_error_bound χ n _ D le_rfl hD
+    _ = (∑ χ : DirichletCharacter ℂ q, ‖psiTwist χ.primitiveCharacter n -
+          (if χ = 1 then (n:ℂ) else 0)‖) + (q.totient:ℝ)*D := by
+      simp only [Finset.sum_add_distrib, Finset.sum_const, Finset.card_univ, hcard, nsmul_eq_mul]
+    _ ≤ (q.totient:ℝ)*(99/100*B) + (q.totient:ℝ)*D :=
+      add_le_add_right hH _
+    _ = _ := by rw [hD']; ring
+
 end BmorScratch
