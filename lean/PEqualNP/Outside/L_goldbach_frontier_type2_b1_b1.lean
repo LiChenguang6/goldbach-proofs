@@ -7911,6 +7911,7 @@ theorem b1B1_one_sided_second_moment_le (n x : ℕ) (hn : 2 ≤ n) (hx : x ≤ n
       Finset.sum_le_sum hPoint
     _ = ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 := by
       rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+      push_cast
       ring
 
 -- ===========================================================================
