@@ -37,4 +37,4 @@ jobs:
       - name: Build the Weyl layer
         working-directory: lean
         run: |
-          time "$HOME/.elan/bin/lake" build PEqualNP.Weyl.BlockBound
+          time "$HOME/.elan/bin/lake" build PEqualNP.Weyl.Weyl
