@@ -3546,3 +3546,166 @@ theorem rightHalf_primitive_good_height {q : ℕ} [NeZero q]
       exact hwin ⟨by linarith [ht.1],by linarith [ht.2]⟩
 
 end GoldbachProgression
+
+
+namespace GoldbachProgression
+open Finset Filter Set MeasureTheory Complex Asymptotics DirichletCharacter
+open scoped BigOperators Classical Topology
+
+theorem rightHalf_reciprocal_zero_sum_of_windows {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (T : ℝ) (hT : 2 ≤ T) (Z : Finset ℂ)
+    (hZ : ∀ z ∈ Z, 1 / 2 ≤ z.re ∧ z.re < 1 ∧ |z.im| ≤ T ∧ χ.LFunction z = 0)
+    (A : ℝ) (hA : 0 ≤ A)
+    (hwin : ∀ (t : ℝ) (S : Finset ℂ),
+      (∀ z ∈ S, 1 / 2 ≤ z.re ∧ z.re < 1 ∧ χ.LFunction z = 0 ∧ |z.im - t| ≤ 1) →
+      (∑ z ∈ S, (analyticOrderNatAt χ.LFunction z : ℝ)) ≤ A * Real.log ((q : ℝ) * (2 + |t|))) :
+    (∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℝ) / ‖z‖) ≤
+      (12 * A) * (Real.log (2 * (q : ℝ) * T)) ^ 2 := by
+  classical
+  let w (z : ℂ) : ℝ := analyticOrderNatAt χ.LFunction z
+  let level (z : ℂ) := ⌊|z.im|⌋₊
+  let J := ⌊T⌋₊ + 1
+  let shell (j : ℕ) := Z.filter (fun z => level z = j)
+  let L := Real.log (2 * (q : ℝ) * T)
+  have hq : (1 : ℝ) ≤ q := by exact_mod_cast (show 1 ≤ q from q.pos_of_neZero)
+  have h2T : 2 * T ≤ 2 * (q : ℝ) * T := by
+    exact mul_le_mul_of_nonneg_right (by linarith) (by linarith)
+  have hLhalf : 1 / 2 ≤ L := by
+    have hh := Real.log_le_log (by norm_num : (0 : ℝ) < 2)
+      (show 2 ≤ 2 * (q : ℝ) * T by linarith)
+    dsimp only [L]
+    linarith only [hh, Real.log_two_gt_d9]
+  have hL : 0 ≤ L := by linarith
+  have hjT {j : ℕ} (hj : j < J) : (j : ℝ) ≤ T := by
+    have hj' : j ≤ ⌊T⌋₊ := Nat.le_of_lt_succ hj
+    exact (Nat.cast_le.mpr hj').trans (Nat.floor_le (by linarith))
+  have hmaps (z : ℂ) (hz : z ∈ Z) : level z ∈ Finset.range J :=
+    Finset.mem_range.mpr (Nat.lt_succ_of_le (Nat.floor_mono (hZ z hz).2.2.1))
+  have hloc {j : ℕ} {z : ℂ} (hz : z ∈ shell j) :
+      z ∈ Z ∧ (j : ℝ) ≤ |z.im| ∧ |z.im| < (j : ℝ) + 1 := by
+    obtain ⟨hzZ, hj⟩ := Finset.mem_filter.mp hz
+    rw [← hj]
+    exact ⟨hzZ, Nat.floor_le (abs_nonneg _), Nat.lt_floor_add_one _⟩
+  have hcount (j : ℕ) (hj : j < J) : (∑ z ∈ shell j, w z) ≤ 2 * A * L := by
+    have hlog : Real.log ((q : ℝ) * (2 + (j : ℝ))) ≤ L := by
+      apply Real.log_le_log (by positivity)
+      calc
+        _ ≤ (q : ℝ) * (2 * T) :=
+          mul_le_mul_of_nonneg_left (by linarith [hjT hj]) (by positivity)
+        _ = _ := by ring
+    have hw (S : Finset ℂ) (t : ℝ) (ht : |t| = (j : ℝ))
+        (hS : ∀ z ∈ S, z ∈ Z ∧ |z.im - t| ≤ 1) : (∑ z ∈ S, w z) ≤ A * L := by
+      have hc := hwin t S (fun z hz =>
+        let v := hZ z (hS z hz).1
+        ⟨v.1, v.2.1, v.2.2.2, (hS z hz).2⟩)
+      rw [ht] at hc
+      exact hc.trans (mul_le_mul_of_nonneg_left hlog hA)
+    have hp : (∑ z ∈ (shell j).filter (fun z => 0 ≤ z.im), w z) ≤ A * L := by
+      apply hw _ j (abs_of_nonneg (Nat.cast_nonneg _))
+      intro z hz
+      obtain ⟨hs, him⟩ := Finset.mem_filter.mp hz
+      obtain ⟨hzZ, hlo, hhi⟩ := hloc hs
+      rw [abs_of_nonneg him] at hlo hhi
+      exact ⟨hzZ, abs_le.mpr ⟨by linarith, by linarith⟩⟩
+    have hn : (∑ z ∈ (shell j).filter (fun z => ¬0 ≤ z.im), w z) ≤ A * L := by
+      apply hw _ (-(j : ℝ)) (by simp)
+      intro z hz
+      obtain ⟨hs, him⟩ := Finset.mem_filter.mp hz
+      obtain ⟨hzZ, hlo, hhi⟩ := hloc hs
+      rw [abs_of_neg (lt_of_not_ge him)] at hlo hhi
+      exact ⟨hzZ, abs_le.mpr ⟨by linarith, by linarith⟩⟩
+    rw [← Finset.sum_filter_add_sum_filter_not (shell j) (fun z => 0 ≤ z.im) w]
+    linarith only [hp, hn]
+  have hbin (j : ℕ) (hj : j < J) :
+      (∑ z ∈ shell j, w z / ‖z‖) ≤ (4 * A * L) * ((j : ℝ) + 1)⁻¹ := by
+    have hjpos : 0 < (j : ℝ) + 1 := by positivity
+    have hi (z : ℂ) (hz : z ∈ shell j) : ‖z‖⁻¹ ≤ 2 / ((j : ℝ) + 1) := by
+      obtain ⟨hzZ, hlo, _⟩ := hloc hz
+      obtain ⟨hz0, hz1, _, hroot⟩ := hZ z hzZ
+      have hre : (1/2:ℝ) ≤ ‖z‖ := by
+        have ha := Complex.abs_re_le_norm z
+        rw [abs_of_nonneg (by linarith : 0 ≤ z.re)] at ha
+        exact hz0.trans ha
+      have hnorm : 0 < ‖z‖ := by linarith
+      rw [← one_div, div_le_div_iff₀ hnorm hjpos]
+      rcases Nat.eq_zero_or_pos j with rfl | hj'
+      · norm_num
+        linarith
+      · have hj1 : 1 ≤ (j : ℝ) := by exact_mod_cast hj'
+        linarith only [hj1, hlo, Complex.abs_im_le_norm z]
+    calc
+      _ ≤ ∑ z ∈ shell j, w z * (2 / ((j : ℝ) + 1)) := by
+        apply Finset.sum_le_sum
+        intro z hz
+        rw [div_eq_mul_inv]
+        exact mul_le_mul_of_nonneg_left (hi z hz) (Nat.cast_nonneg _)
+      _ = (∑ z ∈ shell j, w z) * (2 / ((j : ℝ) + 1)) := (Finset.sum_mul ..).symm
+      _ ≤ (2 * A * L) * (2 / ((j : ℝ) + 1)) :=
+        mul_le_mul_of_nonneg_right (hcount j hj) (by positivity)
+      _ = _ := by ring
+  have hJ : (J : ℝ) ≤ 2 * (q : ℝ) * T := by
+    have hf := Nat.floor_le (show 0 ≤ T by linarith)
+    dsimp only [J]
+    rw [Nat.cast_add_one]
+    linarith
+  have hharm : (harmonic J : ℝ) ≤ 3 * L := by
+    have hJpos : (0 : ℝ) < J := by dsimp [J]; positivity
+    have hlJ : Real.log (J : ℝ) ≤ L := Real.log_le_log hJpos hJ
+    linarith only [harmonic_le_one_add_log J, hlJ, hLhalf]
+  calc
+    _ = ∑ j ∈ Finset.range J, ∑ z ∈ shell j, w z / ‖z‖ :=
+      (Finset.sum_fiberwise_of_maps_to hmaps (fun z => w z / ‖z‖)).symm
+    _ ≤ ∑ j ∈ Finset.range J, (4 * A * L) * ((j : ℝ) + 1)⁻¹ :=
+      Finset.sum_le_sum fun j hj => hbin j (Finset.mem_range.mp hj)
+    _ = (4 * A * L) * (harmonic J : ℝ) := by
+      rw [← Finset.mul_sum]
+      simp [harmonic]
+    _ ≤ (4 * A * L) * (3 * L) := mul_le_mul_of_nonneg_left hharm (by positivity)
+    _ = _ := by dsimp only [L]; ring
+
+
+
+
+
+/-- Reciprocal zero sum, restricted to the right half of the critical strip.
+No zero-line assumption is needed. -/
+theorem rightHalf_primitive_reciprocal_zero_sum {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hprim : χ.IsPrimitive) (T : ℝ) (hT : 2 ≤ T) (Z : Finset ℂ)
+    (hZ : ∀ z ∈ Z, 1/2 ≤ z.re ∧ z.re < 1 ∧ |z.im| ≤ T ∧ χ.LFunction z = 0) :
+    (∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℝ) / ‖z‖) ≤
+      (120 / Real.log (23 / 22)) * (Real.log (2 * (q : ℝ) * T)) ^ 2 := by
+  have h := rightHalf_reciprocal_zero_sum_of_windows χ T hT Z hZ
+    (10 / Real.log (23 / 22)) (div_nonneg (by norm_num) (Real.log_nonneg (by norm_num)))
+    (fun t S => rightHalf_primitive_character_window_count χ hprim t S)
+  convert h using 1
+  ring
+
+/-- If a certified zero-free region bounds real parts by sigma, the
+residue contribution for these zeros inherits an explicit power saving. -/
+theorem rightHalf_unitPerronKernel_zero_sum {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hprim : χ.IsPrimitive) {x T σ : ℝ}
+    (hx : 0 < x) (hT : 2 ≤ T) (Z : Finset ℂ)
+    (hZ : ∀ z ∈ Z, 1/2 ≤ z.re ∧ z.re < 1 ∧ |z.im| ≤ T ∧ χ.LFunction z = 0)
+    (hσ : ∀ z ∈ Z, z.re ≤ σ) :
+    ‖∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℂ) * unitPerronKernel x z‖ ≤
+      (x+1)^σ * ((120 / Real.log (23/22)) * (Real.log (2*q*T))^2) := by
+  have H := rightHalf_primitive_reciprocal_zero_sum χ hprim T hT Z hZ
+  calc
+    _ ≤ ∑ z ∈ Z, ‖(analyticOrderNatAt χ.LFunction z : ℂ) * unitPerronKernel x z‖ :=
+      norm_sum_le _ _
+    _ ≤ ∑ z ∈ Z, (x+1)^σ * ((analyticOrderNatAt χ.LFunction z : ℝ) / ‖z‖) := by
+      apply Finset.sum_le_sum
+      intro z hz
+      have hb := unitPerronKernel_norm hx (show 0 ≤ z.re by linarith [(hZ z hz).1])
+      have he := Real.rpow_le_rpow_of_exponent_le (show 1 ≤ x+1 by linarith) (hσ z hz)
+      rw [norm_mul, Complex.norm_natCast]
+      calc
+        _ ≤ (analyticOrderNatAt χ.LFunction z : ℝ) * ((x+1)^z.re / ‖z‖) :=
+          mul_le_mul_of_nonneg_left hb (Nat.cast_nonneg _)
+        _ ≤ (analyticOrderNatAt χ.LFunction z : ℝ) * ((x+1)^σ / ‖z‖) :=
+          mul_le_mul_of_nonneg_left (div_le_div_of_nonneg_right he (norm_nonneg _)) (Nat.cast_nonneg _)
+        _ = _ := by ring
+    _ = _ := (Finset.mul_sum ..).symm
+    _ ≤ _ := mul_le_mul_of_nonneg_left H (Real.rpow_nonneg (by linarith) _)
+
+end GoldbachProgression
