@@ -8489,7 +8489,7 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
       ring
     _ ≤ C * ((W * (1 + Real.log M)) * tail) := by
       have mainBound := sum_weighted_moduli_le items step weight R M MPositive WNonnegative
-        stepRange weightBound G D F
+        stepRange weightBound G D F energy
         (fun g hg => by have := (mem_Icc.mp hg).1; omega)
         (fun d hd => by have := (mem_Icc.mp hd).1; omega)
         (fun f hf => by have ⟨_, hn0⟩ := Nat.mem_divisors.mp hf; omega)
@@ -8515,7 +8515,7 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
         (mul_nonneg (mul_nonneg WNonnegative mLogNonnegative) tailNonnegative) (by positivity)
       exact mul_le_mul (mul_le_mul_of_nonneg_left stepLog WNonnegative)
         tailBound tailNonnegative (mul_nonneg WNonnegative BNonnegative)
-    _ = _ := by unfold W C; ring
+    _ = _ := by unfold W; ring
 
 -- ===========================================================================
 -- Abstract near-pair bound over the dyadic partition (ref L7699)
