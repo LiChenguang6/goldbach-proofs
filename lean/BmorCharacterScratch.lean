@@ -213,9 +213,68 @@ theorem zeroCountPrimitive_hasDerivAt (d t : ℝ) (hd : 0 < d) (ht : 0 < t) :
       (hasDerivAt_id t) ht.ne')
   unfold zeroCountPrimitive
   convert hh using 1
-  simp only [id_eq]
+  try simp only [id_eq]
   rw [show Real.exp 1*d*t = Real.exp 1*(d*t) by ring,
     Real.log_mul he.ne' (mul_pos hd ht).ne', Real.log_exp]
+  field_simp
+  <;> ring
+
+
+/- BMOR Proposition 2.5 upper envelope and the integral comparison
+   used in the proof of Lemma 2.11, equation (2.11). -/
+noncomputable def zeroCountUpper (d t : ℝ) : ℝ :=
+  t/Real.pi * Real.log (d*t/(2*Real.pi*Real.exp 1)) +
+    (399/1000 : ℝ)*Real.log (d*t) + (5338/1000 : ℝ)
+
+theorem zeroCount_integral_upper (d a b : ℝ) (hd : 0 < d)
+    (ha : 0 < a) (hab : a ≤ b) :
+    (∫ t in a..b, zeroCountUpper d t / t^2) =
+      zeroCountPrimitive d b - zeroCountPrimitive d a := by
+  have hc : ContinuousOn (fun t : ℝ => zeroCountUpper d t / t^2)
+      (Set.uIcc a b) := by
+    intro t ht
+    rw [Set.uIcc_of_le hab] at ht
+    have hpos : 0 < t := ha.trans_le ht.1
+    apply ContinuousAt.continuousWithinAt
+    unfold zeroCountUpper
+    fun_prop (disch := positivity)
+  apply intervalIntegral.integral_eq_sub_of_hasDerivAt _ hc.intervalIntegrable
+  intro t ht
+  rw [Set.uIcc_of_le hab] at ht
+  exact zeroCountPrimitive_hasDerivAt d t hd (ha.trans_le ht.1)
+
+theorem zeroCount_weighted_budget (d a b : ℝ) (hd : 0 < d)
+    (ha : 0 < a) (hab : a ≤ b) (N : ℝ → ℝ)
+    (hN : ∀ t ∈ Set.Icc a b, N t ≤ zeroCountUpper d t)
+    (hint : IntervalIntegrable (fun t => N t / t^2) MeasureTheory.volume a b) :
+    (∫ t in a..b, N t / t^2) ≤
+      zeroCountPrimitive d b - zeroCountPrimitive d a := by
+  have hc : ContinuousOn (fun t : ℝ => zeroCountUpper d t / t^2)
+      (Set.uIcc a b) := by
+    intro t ht
+    rw [Set.uIcc_of_le hab] at ht
+    have hpos : 0 < t := ha.trans_le ht.1
+    apply ContinuousAt.continuousWithinAt
+    unfold zeroCountUpper
+    fun_prop (disch := positivity)
+  rw [← zeroCount_integral_upper d a b hd ha hab]
+  apply intervalIntegral.integral_mono_on hab hint hc.intervalIntegrable
+  intro t ht
+  exact div_le_div_of_nonneg_right (hN t ht) (sq_nonneg t)
+
+theorem zeroCount_endpoint_identity (d H : ℝ) (hd : 0 < d) (hH : 0 < H) :
+    zeroCountUpper d H / H + zeroCountPrimitive d H =
+      (Real.log (d*H/(2*Real.pi)))^2/(2*Real.pi) -
+        1/(2*Real.pi) - (399/1000 : ℝ)/H := by
+  have hp := Real.pi_pos
+  have he := Real.exp_pos (1:ℝ)
+  have hX : 0 < d*H/(2*Real.pi) := by positivity
+  unfold zeroCountUpper zeroCountPrimitive
+  rw [show d*H/(2*Real.pi*Real.exp 1) =
+      (d*H/(2*Real.pi))/(Real.exp 1) by ring,
+    Real.log_div hX.ne' he.ne', Real.log_exp,
+    show Real.exp 1*d*H = Real.exp 1*(d*H) by ring,
+    Real.log_mul he.ne' (mul_pos hd hH).ne', Real.log_exp]
   field_simp
   <;> ring
 
