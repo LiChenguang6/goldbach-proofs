@@ -6365,3 +6365,26 @@ theorem b1B1_pair_integral_low (n : ℕ) (b : ℝ) (hb : 0 < b) (u v : ℕ)
   exact pair_integral n b hb u v hu hv z hz
 
 end GoldbachB1B1Adapt
+
+namespace GoldbachB1B1Target
+
+open GoldbachB1B1
+
+/-- Frozen frontier statement (proof deferred): for every `ε > 0` there exists `N` such
+    that for every even `n ≥ N`, the deep-pair norm satisfies
+    `‖Jdeep n (τ₁ n) (τ₁ n)‖ ≤ ε · n`. Quantifier order, `Even n` position, complex
+    norm and scaling are preserved verbatim from the frozen target. -/
+theorem b1B1_target :
+    ∀ ε : ℝ, 0 < ε → ∃ N : ℕ, ∀ n : ℕ, N ≤ n → Even n →
+      ‖Jdeep n (τ₁ n) (τ₁ n)‖ ≤ ε * (n : ℝ) := by
+  sorry
+
+/-- τ₁ unfolded along its atom-divisor sum (a definition-level identity). -/
+theorem b1B1_tau1_atom_sum (n m : ℕ) :
+    τ₁ n m =
+      ∑ p ∈ (Nat.divisors m).filter (fun a => U n < a ∧ a ≤ B₁ n ∧ U n < m / a),
+        (∑ d ∈ (Nat.divisors p).filter (fun d => U n < d), μ d) *
+          ArithmeticFunction.vonMangoldt (m / p) := by
+  rfl
+
+end GoldbachB1B1Target
