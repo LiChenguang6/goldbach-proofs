@@ -770,11 +770,11 @@ theorem logPowerTailPrimitive_hasDerivAt (d m t : ℝ) (hd : 0 < d)
   have h := (hL.add_const (1/m^2)).neg.mul hR
   unfold logPowerTailPrimitive
   convert h using 1
-  · funext z
-    rfl
-  · try simp only [id_eq]
-    field_simp [hd.ne', hm.ne', ht.ne']
-    <;> ring
+  change _ = -(d / (d * t) / m) * Real.exp (-m * Real.log t) +
+    (-(Real.log (d*t)/m + 1/m^2)) *
+      (Real.exp (-m*Real.log t) * (-m*t⁻¹))
+  field_simp [hd.ne', hm.ne', ht.ne']
+  <;> ring
 
 theorem logPowerTailIntegral (d m a b : ℝ) (hd : 0 < d) (hm : 0 < m)
     (ha : 0 < a) (hab : a ≤ b) :
