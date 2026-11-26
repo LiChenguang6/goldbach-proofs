@@ -8096,26 +8096,6 @@ theorem b1B1_lowAtomWeight_bound (n : ℕ) (hn : 1 ≤ n) {p : ℕ × ℕ}
     _ ≤ T * logBudget n :=
       mul_le_mul_of_nonneg_left logBnorm TNonnegative
 
--- ======================================================================
--- 4. Fibre bound (step fibres over `lowAtomStep = a`)
--- ======================================================================
-
--- SOURCE: ref L6759 `sum_atomWeight_fibre_le`.
--- DIFF / TODO: reference step = d·b, so its fibre injects into divisors of the
--- step and `fibre.card ≤ τ(u)`. Our step = a (the product `a·b` stays in the
--- mode layer), so the fibre over `u = a` contains every admissible cofactor
--- `b ≤ n/u`; the elementary bound below carries an `n/u` factor. This factor
--- does NOT fit the `W = T·logBudget` offWave budget (see assembly §11.3-2);
--- a tighter cancellation bound, or a mode-level far/near decomposition, is
--- still required before this fibre lemma can feed the budget layer.
-theorem b1B1_lowAtomWeight_fibre_le (n : ℕ) {u : ℕ} (hu : u ∈ Icc 1 (BM n))
-    {T : ℝ} (TNonnegative : 0 ≤ T)
-    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
-    ∑ p ∈ (lowAtomSet n).filter (fun p => lowAtomStep n p = u),
-      ‖lowAtomWeight n p‖ ≤ T * (n / u) * logBudget n := by
-  -- TODO: prove `Σ_{b ∈ Ioc (U n) (n/u)} Λ b ≤ (n/u)·logBudget n`
-  -- (elementary von Mangoldt prefix bound); then fold the per-atom bound above.
-  sorry
 
 -- ======================================================================
 -- 5. Abstract near-pair replacement (port of ref L7339 `norm_nearPair_replacement_le`)
