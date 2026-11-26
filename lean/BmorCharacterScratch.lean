@@ -99,7 +99,7 @@ theorem principal_twist_eq {q : ℕ} [NeZero q] (n : ℕ) :
       h ((ZMod.isUnit_iff_coprime k q).1 h')
     simp [h, MulChar.map_nonunit (1 : DirichletCharacter ℂ q) hu]
 
-noncomputable def centeredTwist {q : ℕ} (χ : DirichletCharacter ℂ q) (n : ℕ) : ℂ :=
+noncomputable def centeredTwist {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (n : ℕ) : ℂ :=
   psiTwist χ n - if χ = 1 then (n : ℂ) else 0
 
 /-- The absolute character error is independent of the reduced residue a. -/
@@ -114,7 +114,7 @@ theorem character_error_norm_eq {q : ℕ} [NeZero q] (a n : ℕ)
   by_cases hχ : χ = 1
   · subst χ
     simp [characterError, centeredTwist, hi, MulChar.one_apply_coe]
-  · simp only [characterError, centeredTwist, hχ, if_false, sub_zero, norm_mul, hi]
+  · simp only [characterError, centeredTwist, hχ, ite_false, sub_zero, norm_mul, hi]
     rw [χ.unit_norm_eq_one (u⁻¹), one_mul]
 
 /-- A uniform bound for the centered twists suffices for the AP error bound.
@@ -140,11 +140,50 @@ theorem uniform_twist_budget {q : ℕ} [NeZero q] (a n : ℕ)
         exact hB χ
       _ = _ := by simp [hcard, nsmul_eq_mul]
   have hnorm : ‖(q.totient : ℂ)⁻¹‖ = (q.totient : ℝ)⁻¹ := by
-    simp [norm_inv, Complex.norm_natCast, Real.norm_eq_abs]
+    simp
   rw [hnorm]
   calc
     _ ≤ (q.totient : ℝ)⁻¹ * ((q.totient : ℝ) * B) :=
       mul_le_mul_of_nonneg_left hs (inv_nonneg.mpr hpos.le)
     _ = B := by field_simp
+
+
+/-- The averaged error budget suffices; a uniform bound per character is unnecessary. -/
+theorem average_twist_budget {q : ℕ} [NeZero q] (a n : ℕ)
+    (ha : Nat.Coprime a q) (B : ℝ)
+    (hB : (∑ χ : DirichletCharacter ℂ q, ‖centeredTwist χ n‖) ≤
+      (q.totient : ℝ) * B) :
+    |psiAP q a n - (n : ℝ) / (q.totient : ℝ)| ≤ B := by
+  classical
+  apply character_budget_transfer a n ha B
+  have hpos : (0 : ℝ) < q.totient := by
+    exact_mod_cast Nat.totient_pos.mpr (Nat.pos_of_ne_zero (NeZero.ne q))
+  have hsum : (∑ χ : DirichletCharacter ℂ q, ‖characterError a n χ‖) =
+      ∑ χ : DirichletCharacter ℂ q, ‖centeredTwist χ n‖ := by
+    apply Finset.sum_congr rfl
+    intro χ hχ
+    exact character_error_norm_eq a n ha χ
+  rw [hsum]
+  have hnorm : ‖(q.totient : ℂ)⁻¹‖ = (q.totient : ℝ)⁻¹ := by simp
+  rw [hnorm]
+  calc
+    _ ≤ (q.totient : ℝ)⁻¹ * ((q.totient : ℝ) * B) :=
+      mul_le_mul_of_nonneg_left hB (inv_nonneg.mpr hpos.le)
+    _ = B := by field_simp
+
+/-- Exact conditional reduction of the frozen target to the averaged analytic budget. -/
+theorem bmor_of_average
+    (H : ∀ (q n : ℕ) [NeZero q], 3 ≤ q → q ≤ 105 →
+      8000000000 ≤ n →
+      (∑ χ : DirichletCharacter ℂ q, ‖centeredTwist χ n‖) ≤
+        (q.totient : ℝ) * ((n : ℝ) / (840 * Real.log (n : ℝ)))) :
+    ∀ (q a n : ℕ), 3 ≤ q → q ≤ 105 → a < q → Nat.Coprime a q →
+      8000000000 ≤ n →
+      |(∑ k ∈ (Finset.range (n+1)).filter (fun k => k % q = a % q),
+        ArithmeticFunction.vonMangoldt k) - (n:ℝ)/Nat.totient q|
+        ≤ (n:ℝ)/(840 * Real.log (n:ℝ)) := by
+  intro q a n hq hq' _ha hcop hn
+  letI : NeZero q := ⟨by omega⟩
+  exact average_twist_budget a n hcop _ (H q n hq hq' hn)
 
 end BmorScratch
