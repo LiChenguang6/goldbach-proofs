@@ -1431,8 +1431,8 @@ theorem higherMass_bound (n : ℕ) (hn : 10^16 ≤ n) :
   have hU : 10000 ≤ u := by
     by_contra! h
     have h4 : u^4 < (10000:ℝ)^4 := by gcongr
-    norm_num at h4 hn'
-    linarith
+    rw [hu4, show (10000:ℝ)^4 = (10:ℝ)^16 by norm_num] at h4
+    exact (not_lt_of_ge hn') h4
   have hlog : Real.log (n:ℝ) ≤ 4*u := by
     have h := Real.log_le_rpow_div hx.le (by norm_num : (0:ℝ) < 1/4)
     change Real.log (n:ℝ) ≤ u/(1/4:ℝ) at h
@@ -1555,7 +1555,9 @@ theorem theta_frozen_of_bmor
     constructor <;> linarith only [hl1,hr1,hl3,hr3]
   by_cases hq1 : q = 1
   · subst q
-    have hEq : thetaAP 1 a n = thetaAP 1 0 n := by simp [thetaAP]
+    have hEq : thetaAP 1 a n = thetaAP 1 0 n := by
+      unfold thetaAP
+      rw [Nat.mod_one a, Nat.zero_mod]
     rw [hEq, thetaAP_mod_one n (by omega)]
     have htot : Nat.totient 1 = 1 := by decide
     rw [htot]
