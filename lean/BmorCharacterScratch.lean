@@ -463,4 +463,87 @@ theorem explicitFormula_three_bands {ι : Type*} (s₁ s₂ s₃ : Finset ι)
       rw [norm_neg] at he
       linarith only [ha, hb, hc, hd, he, hR]
 
+
+/- BMOR primitive-character reduction: a character induced from a smaller
+   modulus differs only at the nonunits of the larger modulus. -/
+theorem changeLevel_apply_nat {d q : ℕ} (hd : d ∣ q)
+    (χ : DirichletCharacter ℂ d) (k : ℕ) :
+    (DirichletCharacter.changeLevel hd χ) (k : ZMod q) =
+      if Nat.Coprime k q then χ (k : ZMod d) else 0 := by
+  by_cases hk : Nat.Coprime k q
+  · rw [if_pos hk]
+    have h := χ.changeLevel_eq_cast_of_dvd hd (ZMod.unitOfCoprime k hk)
+    simpa only [ZMod.coe_unitOfCoprime, ZMod.cast_natCast hd] using h
+  · rw [if_neg hk]
+    exact MulChar.map_nonunit _ (fun hu => hk ((ZMod.isUnit_iff_coprime k q).1 hu))
+
+theorem changeLevel_twist_difference {d q : ℕ} (hd : d ∣ q)
+    (χ : DirichletCharacter ℂ d) (n : ℕ) :
+    psiTwist χ n - psiTwist (DirichletCharacter.changeLevel hd χ) n =
+      ∑ k ∈ (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q),
+        χ (k : ZMod d) * (ArithmeticFunction.vonMangoldt k : ℂ) := by
+  classical
+  unfold psiTwist
+  rw [← Finset.sum_sub_distrib, Finset.sum_filter]
+  apply Finset.sum_congr rfl
+  intro k hk
+  rw [changeLevel_apply_nat hd χ k]
+  by_cases hc : Nat.Coprime k q <;> simp [hc]
+
+theorem changeLevel_twist_bound {d q : ℕ} [NeZero d] (hd : d ∣ q)
+    (χ : DirichletCharacter ℂ d) (n : ℕ) :
+    ‖psiTwist χ n - psiTwist (DirichletCharacter.changeLevel hd χ) n‖ ≤
+      ∑ k ∈ (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q),
+        ArithmeticFunction.vonMangoldt k := by
+  rw [changeLevel_twist_difference hd χ n]
+  calc
+    _ ≤ ∑ k ∈ (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q),
+        ‖χ (k : ZMod d) * (ArithmeticFunction.vonMangoldt k : ℂ)‖ :=
+      norm_sum_le _ _
+    _ ≤ _ := by
+      apply Finset.sum_le_sum
+      intro k hk
+      rw [norm_mul, Complex.norm_real, Real.norm_eq_abs,
+        abs_of_nonneg ArithmeticFunction.vonMangoldt_nonneg]
+      exact mul_le_of_le_one_left ArithmeticFunction.vonMangoldt_nonneg
+        (χ.norm_le_one (k : ZMod d))
+
+/-- Bound the imprimitive character correction by the nonunit prime-power
+    mass.  The cardinal/logarithmic estimate for that mass is a separate
+    number-theoretic input, not an axiom introduced in this development. -/
+theorem primitive_twist_bound {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (n : ℕ) :
+    ‖psiTwist χ.primitiveCharacter n - psiTwist χ n‖ ≤
+      ∑ k ∈ (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q),
+        ArithmeticFunction.vonMangoldt k := by
+  letI : NeZero χ.conductor := ⟨χ.conductor_ne_zero⟩
+  have h := changeLevel_twist_bound χ.conductor_dvd_level χ.primitiveCharacter n
+  rw [χ.changeLevel_primitiveCharacter] at h
+  exact h
+
+theorem primitive_principal_iff {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) :
+    χ.primitiveCharacter = 1 ↔ χ = 1 := by
+  constructor
+  · intro h
+    rw [← χ.changeLevel_primitiveCharacter, h, map_one]
+  · intro h
+    subst χ
+    exact DirichletCharacter.primitiveCharacter_one
+
+theorem primitive_centered_error_bound {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (n : ℕ)
+    (B D : ℝ) (hB : ‖psiTwist χ.primitiveCharacter n -
+      (if χ = 1 then (n : ℂ) else 0)‖ ≤ B)
+    (hD : (∑ k ∈ (Finset.range (n+1)).filter (fun k => ¬ Nat.Coprime k q),
+        ArithmeticFunction.vonMangoldt k) ≤ D) :
+    ‖centeredTwist χ n‖ ≤ B + D := by
+  have hd := primitive_twist_bound χ n
+  have hh : centeredTwist χ n =
+      (psiTwist χ.primitiveCharacter n - (if χ = 1 then (n : ℂ) else 0)) -
+      (psiTwist χ.primitiveCharacter n - psiTwist χ n) := by
+    unfold centeredTwist
+    ring
+  rw [hh]
+  exact (norm_sub_le _ _).trans (add_le_add hB (hd.trans hD))
+
 end BmorScratch
