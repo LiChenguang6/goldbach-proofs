@@ -8030,6 +8030,11 @@ theorem b1B1_norm_sum_windowKernel_difference_le (n M B H q g l r : ℕ) [NeZero
   have heq (m : ℕ) : ((m : ℝ) - (n : ℝ)) = (((m : ℤ) - (n : ℤ) : ℤ) : ℝ) := by
     push_cast; ring
   simp only [heq]
+  have hR : 0 ≤ C := by
+    unfold C
+    exact mul_nonneg (by positivity)
+      (mul_nonneg (by norm_num) (radius_nonnegative M))
+  have hAC : 0 ≤ A * C := mul_nonneg ANonnegative hR
   rw [← sum_sub_distrib]
   simp only [← mul_sub]
   refine (norm_sum_le _ _).trans ?_
@@ -8045,9 +8050,7 @@ theorem b1B1_norm_sum_windowKernel_difference_le (n M B H q g l r : ℕ) [NeZero
           (norm_nonneg _) ANonnegative) (norm_nonneg _)
     _ = (A * C) * ∑ m ∈ range (n + 1), ‖ramanujan q ((m : ℤ) - n)‖ :=
       (mul_sum _ _ _).symm
-    _ ≤ _ := mul_le_mul_of_nonneg_left (sum_norm_shifted_ramanujan_le qLower n)
-      (mul_nonneg ANonnegative (by dsimp [C]; exact mul_nonneg (by positivity)
-        (mul_nonneg (by norm_num) (radius_nonnegative M))))
+    _ ≤ _ := mul_le_mul_of_nonneg_left (sum_norm_shifted_ramanujan_le qLower n) hAC
 
 -- ======================================================================
 -- 3. Atom weight bound (atom side, single `T`)
