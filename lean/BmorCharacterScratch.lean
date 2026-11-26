@@ -996,4 +996,98 @@ theorem perronKernel_norm_le (x c t : ℝ) (hx : 0 < x) (ht : 0 < |t|) :
   exact div_le_div_of_nonneg_left (Real.rpow_nonneg hx.le _)
     (by positivity) hden
 
+
+/- Exact smoothed Perron kernel by Mathlib's Mellin inversion.
+   This avoids a new contour-integration hypothesis for the kernel itself.
+   The later shift across L-function zeros still needs a residue argument. -/
+noncomputable def smoothCut (u : ℝ) : ℂ :=
+  (Set.Ioc (0:ℝ) 1).indicator (fun _ => (1:ℂ)) u -
+    (Set.Ioc (0:ℝ) 1).indicator (fun v => (v:ℂ)) u
+
+theorem smoothCut_hasMellin (s : ℂ) (hs : 0 < s.re) :
+    HasMellin smoothCut s (1/(s*(s+1))) := by
+  have h0 := hasMellin_one_Ioc hs
+  have h1 := hasMellin_cpow_Ioc 1 (s := s)
+    (by simp only [Complex.one_re]; linarith)
+  simp only [Complex.cpow_one] at h1
+  have h := hasMellin_sub h0.1 h1.1
+  unfold smoothCut
+  rw [h0.2, h1.2] at h
+  have hs0 : s ≠ 0 := by
+    intro h
+    rw [h, Complex.zero_re] at hs
+    exact (lt_irrefl _ hs)
+  have hs1 : s+1 ≠ 0 := by
+    intro h
+    have he := congrArg Complex.re h
+    simp at he
+    linarith
+  convert h using 1
+  field_simp [hs0, hs1]
+  <;> ring
+
+theorem smoothCut_eq_max (u : ℝ) (hu : 0 < u) :
+    smoothCut u = ((max (1-u) 0 : ℝ):ℂ) := by
+  unfold smoothCut
+  by_cases h : u ≤ 1
+  · have hm : u ∈ Set.Ioc (0:ℝ) 1 := ⟨hu,h⟩
+    rw [Set.indicator_of_mem hm, Set.indicator_of_mem hm, max_eq_left (by linarith)]
+    push_cast
+    rfl
+  · have hm : u ∉ Set.Ioc (0:ℝ) 1 := fun hm => h hm.2
+    rw [Set.indicator_of_notMem hm, Set.indicator_of_notMem hm,
+      max_eq_right (by linarith), Complex.ofReal_zero, sub_zero]
+
+theorem smoothCut_continuousAt (u : ℝ) (hu : 0 < u) :
+    ContinuousAt smoothCut u := by
+  have hc : ContinuousAt (fun v : ℝ => ((max (1-v) 0 : ℝ):ℂ)) u := by fun_prop
+  apply hc.congr
+  filter_upwards [Ioi_mem_nhds hu] with v hv
+  exact (smoothCut_eq_max v hv).symm
+
+theorem smoothCut_mellin_vertical_integrable (c : ℝ) (hc : 1 ≤ c) :
+    Complex.VerticalIntegrable (mellin smoothCut) c := by
+  have hM (t : ℝ) : mellin smoothCut ((c:ℂ)+(t:ℂ)*Complex.I) =
+      1/(((c:ℂ)+(t:ℂ)*Complex.I)*((c:ℂ)+(t:ℂ)*Complex.I+1)) :=
+    (smoothCut_hasMellin _ (by
+      simp [Complex.add_re, Complex.mul_re]
+      linarith)).2
+  unfold Complex.VerticalIntegrable
+  simp_rw [hM]
+  apply integrable_inv_one_add_sq.mono' (g := fun t : ℝ =>
+     1/(((c:ℂ)+(t:ℂ)*Complex.I)*((c:ℂ)+(t:ℂ)*Complex.I+1)))
+  · fun_prop
+  · filter_upwards with t
+    have h := perronKernel_norm 1 c t (by norm_num)
+    simp only [perronKernel, Complex.ofReal_one, Complex.one_cpow, Real.one_rpow] at h
+    rw [h]
+    have hc2 : 1 ≤ c^2 := by nlinarith
+    have hc3 : 1 ≤ (c+1)^2 := by nlinarith
+    have h1 : Real.sqrt (1+t^2) ≤ Real.sqrt (c^2+t^2) :=
+      Real.sqrt_le_sqrt (by linarith)
+    have h2 : Real.sqrt (1+t^2) ≤ Real.sqrt ((c+1)^2+t^2) :=
+      Real.sqrt_le_sqrt (by linarith)
+    have hm := mul_le_mul h1 h2 (Real.sqrt_nonneg _) (Real.sqrt_nonneg _)
+    rw [← sq, Real.sq_sqrt (by positivity)] at hm
+    rw [← one_div]
+    exact div_le_div_of_nonneg_left zero_le_one (by positivity) hm
+
+/-- Mellin inversion gives the exact triangular cutoff, not an asymptotic
+    assertion and not a conditional Perron-kernel hypothesis. -/
+theorem smoothed_perron_inversion (c u : ℝ) (hc : 1 ≤ c) (hu : 0 < u) :
+    mellinInv c (fun s : ℂ => 1/(s*(s+1))) u =
+      ((max (1-u) 0 : ℝ):ℂ) := by
+  have hM : MellinConvergent smoothCut (c:ℂ) :=
+    (smoothCut_hasMellin _ (by simp; linarith)).1
+  have h := mellinInv_mellin_eq c smoothCut hu hM
+    (smoothCut_mellin_vertical_integrable c hc) (smoothCut_continuousAt u hu)
+  rw [smoothCut_eq_max u hu] at h
+  rw [← h]
+  unfold mellinInv
+  congr 1
+  apply integral_congr_ae
+  filter_upwards with t
+  rw [(smoothCut_hasMellin ((c:ℂ)+(t:ℂ)*Complex.I) (by
+    simp [Complex.add_re, Complex.mul_re]; linarith)).2]
+
 end BmorScratch
