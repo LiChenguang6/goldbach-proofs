@@ -6795,3 +6795,58 @@ theorem gcd_sqrt_reciprocal_sum_le (f G : ℕ) (fPositive : 0 < f) :
 
 end
 end GoldbachB1B1GcdSeries
+
+namespace GoldbachB1B1NewMath
+
+open Finset Filter ArithmeticFunction
+open GoldbachB1B1
+open DyadicMixedB4GcdHarmonic
+
+/-- G3 / 1B: gcd-weighted harmonic sum over the low divisor band `(U n, B₁ n]`,
+    restricted to `gcd(a,a') ∣ n`. Bare reuse of Port `gcd_reciprocal_sum_le`;
+    the divisor envelope enters the per-step weight `W`, so no `T²` factor here. -/
+theorem b1B1_gcd_count (n : ℕ) :
+    ∑ a ∈ Ioc (U n) (B₁ n), ∑ a' ∈ Ioc (U n) (B₁ n),
+      (if Nat.gcd a a' ∣ n then (Nat.gcd a a' : ℝ) / ((a : ℝ) * a') else 0) ≤
+      (1 + Real.log (B₁ n : ℝ)) ^ 3 := by
+  let S := Ioc (U n) (B₁ n)
+  let B := B₁ n
+  have subset : S ⊆ Icc 1 B := by
+    intro a ha
+    obtain ⟨hu, hb⟩ := mem_Ioc.mp ha
+    exact mem_Icc.mpr ⟨by omega, hb⟩
+  let bare (a a' : ℕ) : ℝ := (Nat.gcd a a' : ℝ) / ((a : ℝ) * a')
+  have ind_le_bare (a a' : ℕ) :
+      (if Nat.gcd a a' ∣ n then bare a a' else 0) ≤ bare a a' := by
+    split_ifs with hdiv
+    · rfl
+    · positivity
+  have bare_nonneg (a a' : ℕ) : 0 ≤ bare a a' := by positivity
+  by_cases hB : 0 < B
+  · have hMain := gcd_reciprocal_sum_le B hB
+    have hInner (a : ℕ) : (∑ a' ∈ S, bare a a') ≤ ∑ a' ∈ Icc 1 B, bare a a' := by
+      apply sum_le_sum_of_subset_of_nonneg
+      · exact subset
+      · intro a' _ _
+        exact bare_nonneg a a'
+    calc
+      _ ≤ ∑ a ∈ S, ∑ a' ∈ S, bare a a' :=
+        sum_le_sum fun a _ => sum_le_sum fun a' _ => ind_le_bare a a'
+      _ ≤ ∑ a ∈ S, ∑ a' ∈ Icc 1 B, bare a a' :=
+        sum_le_sum fun a _ => hInner a
+      _ ≤ ∑ a ∈ Icc 1 B, ∑ a' ∈ Icc 1 B, bare a a' := by
+        apply sum_le_sum_of_subset_of_nonneg
+        · exact subset
+        · intro a _ _
+          exact sum_nonneg fun a' _ => bare_nonneg a a'
+      _ ≤ _ := hMain
+  · have hBzero : B = 0 := by omega
+    have hLHS : (∑ a ∈ S, ∑ a' ∈ S,
+        (if Nat.gcd a a' ∣ n then bare a a' else 0)) = 0 := by
+      refine sum_eq_zero fun a ha => ?_
+      have hcontra : a ∈ (Icc 1 B) := subset ha
+      simp [hBzero] at hcontra
+    rw [hLHS]
+    positivity
+
+end GoldbachB1B1NewMath
