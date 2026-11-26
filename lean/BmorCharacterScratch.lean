@@ -1046,6 +1046,7 @@ theorem smoothCut_continuousAt (u : ℝ) (hu : 0 < u) :
   filter_upwards [Ioi_mem_nhds hu] with v hv
   exact (smoothCut_eq_max v hv).symm
 
+set_option maxHeartbeats 1000000 in
 theorem smoothCut_mellin_vertical_integrable (c : ℝ) (hc : 1 ≤ c) :
     Complex.VerticalIntegrable (mellin smoothCut) c := by
   have hM (t : ℝ) : mellin smoothCut ((c:ℂ)+(t:ℂ)*Complex.I) =
@@ -1056,8 +1057,8 @@ theorem smoothCut_mellin_vertical_integrable (c : ℝ) (hc : 1 ≤ c) :
   unfold Complex.VerticalIntegrable
   simp_rw [hM]
   apply integrable_inv_one_add_sq.mono'
-  · apply Measurable.aestronglyMeasurable
-    exact measurable_const.div (by fun_prop)
+  · have hm : Measurable (fun t : ℝ => (c:ℂ)+(t:ℂ)*Complex.I) := by fun_prop
+    exact (measurable_const.div (hm.mul (hm.add measurable_const))).aestronglyMeasurable
   · filter_upwards with t
     have h := perronKernel_norm 1 c t (by norm_num)
     simp only [perronKernel, Complex.ofReal_one, Complex.one_cpow, Real.one_rpow] at h
