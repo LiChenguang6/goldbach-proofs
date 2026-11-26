@@ -6443,3 +6443,166 @@ theorem norm_indicator_product_le {f g : ℝ → ℂ} {s : Set ℝ} {scale : ℝ
         intervalIntegral.integral_const_mul, intervalIntegral.integral_const_mul]
 
 end GoldbachB1B1Tool
+
+namespace GoldbachB1B1OffWave
+
+open Finset MeasureTheory Filter
+open DyadicMixedB4Geometric DyadicMixedB4GcdHarmonic
+
+theorem wave_continuous (g l r : ℕ) : Continuous (wave g l r) := by
+  unfold wave phase; fun_prop
+
+theorem offWave_measurable (b : ℝ) (g l r : ℕ) : Measurable (offWave b g l r) :=
+  (wave_continuous g l r).measurable.indicator (gridNear_measurable b g).compl
+
+theorem norm_offWave_le (b : ℝ) (g l r : ℕ) (t : ℝ) : ‖offWave b g l r t‖ ≤ r := by
+  unfold offWave
+  by_cases outside : t ∈ (gridNear b g)ᶜ
+  · rw [Set.indicator_of_mem outside]
+    exact wave_cap g l r t
+  · rw [Set.indicator_of_notMem outside, norm_zero]
+    exact Nat.cast_nonneg _
+
+/-- Square-integrability of the norm of a finite offWave linear combination. -/
+theorem intervalIntegrable_offWave_norm_sq {ι : Type*} (items : Finset ι) (b : ℝ)
+    (g l r : ι → ℕ) (c : ι → ℂ) :
+    IntervalIntegrable (fun t => ‖∑ i ∈ items, c i * offWave b (g i) (l i) (r i) t‖ ^ 2) volume 0 1 := by
+  rw [intervalIntegrable_iff_integrableOn_Ioc_of_le zero_le_one]
+  have measurable : Measurable (fun t => ∑ i ∈ items, c i * offWave b (g i) (l i) (r i) t) :=
+    Finset.measurable_sum _ (fun i _ => measurable_const.mul (offWave_measurable b (g i) (l i) (r i)))
+  apply Integrable.of_bound (measurable.norm.pow_const 2).aestronglyMeasurable
+    ((∑ i ∈ items, ‖c i‖ * (r i : ℝ)) ^ 2)
+  filter_upwards with t
+  rw [Real.norm_eq_abs, abs_of_nonneg (sq_nonneg _)]
+  apply pow_le_pow_left₀ (norm_nonneg _) _ 2
+  refine (norm_sum_le _ _).trans (sum_le_sum (fun i _ => ?_))
+  rw [norm_mul]
+  exact mul_le_mul_of_nonneg_left (norm_offWave_le b (g i) (l i) (r i) t) (norm_nonneg _)
+
+/-- Pairwise expansion of the offWave second moment, bounded step-by-step by `awayBound`. -/
+theorem offWave_mass_le_pairwise {ι : Type*} (items : Finset ι) (n : ℕ) (b : ℝ)
+    (bPositive : 0 < b) (g l r : ι → ℕ) (c : ι → ℂ)
+    (gRange : ∀ i ∈ items, 0 < g i ∧ g i ≤ n) (rRange : ∀ i ∈ items, r i ≤ n / g i) :
+    (∫ t in (0 : ℝ)..1, ‖∑ i ∈ items, c i * offWave b (g i) (l i) (r i) t‖ ^ 2) ≤
+      ∑ i ∈ items, ∑ j ∈ items, (‖c i‖ * ‖c j‖) * (128 * ((1 + Real.log ((n : ℝ) + 2)) ^ 2 +
+        ((g i).gcd (g j) : ℝ) / ((g i : ℝ) * (g j : ℝ) * b))) := by
+  let H (i j : ι) : ℝ → ℝ := (gridNear b ((g i).gcd (g j)))ᶜ.indicator
+    (fun t => ‖wave (g i) (l i) (r i) t * wave (g j) (l j) (r j) t‖)
+  let P (i j : ι) (t : ℝ) : ℝ := (‖c i‖ * ‖c j‖) * H i j t
+  let f (t : ℝ) : ℝ := ‖∑ i ∈ items, c i * offWave b (g i) (l i) (r i) t‖ ^ 2
+  have fIntegrable : IntervalIntegrable f volume 0 1 := intervalIntegrable_offWave_norm_sq items b g l r c
+  have HIntegrable (i j : ι) : IntervalIntegrable (H i j) volume 0 1 := by
+    rw [intervalIntegrable_iff_integrableOn_Ioc_of_le zero_le_one]
+    have continuous : Continuous (fun t => ‖wave (g i) (l i) (r i) t * wave (g j) (l j) (r j) t‖) :=
+      ((wave_continuous _ _ _).mul (wave_continuous _ _ _)).norm
+    exact (continuous.continuousOn.integrableOn_Icc.mono_set Set.Ioc_subset_Icc_self).indicator
+      (gridNear_measurable b ((g i).gcd (g j))).compl
+  have pairIntegrable (i j : ι) : IntervalIntegrable (P i j) volume 0 1 :=
+    (HIntegrable i j).const_mul (‖c i‖ * ‖c j‖)
+  have rowIntegrable (i : ι) : IntervalIntegrable (fun t => ∑ j ∈ items, P i j t) volume 0 1 := by
+    have integrated := IntervalIntegrable.sum items (fun j _ => pairIntegrable i j)
+    convert integrated using 1
+    funext t
+    simp only [Finset.sum_apply]
+  have sumIntegrable : IntervalIntegrable (fun t => ∑ i ∈ items, ∑ j ∈ items, P i j t) volume 0 1 := by
+    have integrated := IntervalIntegrable.sum items (fun i _ => rowIntegrable i)
+    convert integrated using 1
+    funext t
+    simp only [Finset.sum_apply]
+  have pointwise (t : ℝ) : f t ≤ ∑ i ∈ items, ∑ j ∈ items, P i j t := by
+    calc
+      _ ≤ (∑ i ∈ items, ‖c i * offWave b (g i) (l i) (r i) t‖) ^ 2 := by
+        exact pow_le_pow_left₀ (norm_nonneg _) (norm_sum_le _ _) 2
+      _ = ∑ i ∈ items, ∑ j ∈ items, (‖c i‖ * ‖c j‖) *
+          ‖offWave b (g i) (l i) (r i) t * offWave b (g j) (l j) (r j) t‖ := by
+        rw [pow_two, sum_mul_sum]
+        refine sum_congr rfl fun i _ => sum_congr rfl fun j _ => ?_
+        simp only [norm_mul]
+        ring
+      _ ≤ _ := by
+        refine sum_le_sum fun i iMember => sum_le_sum fun j jMember => ?_
+        exact mul_le_mul_of_nonneg_left
+          (norm_offWave_mul_le b (gRange i iMember).1 (gRange j jMember).1 _ _ _ _ t)
+          (mul_nonneg (norm_nonneg _) (norm_nonneg _))
+  change (∫ t in (0 : ℝ)..1, f t) ≤ _
+  calc
+    _ ≤ ∫ t in (0 : ℝ)..1, ∑ i ∈ items, ∑ j ∈ items, P i j t :=
+      intervalIntegral.integral_mono_on zero_le_one fIntegrable sumIntegrable (fun t _ => pointwise t)
+    _ = ∑ i ∈ items, ∑ j ∈ items, (‖c i‖ * ‖c j‖) * ∫ t in (0 : ℝ)..1, H i j t := by
+      rw [intervalIntegral.integral_finsetSum (fun i _ => rowIntegrable i)]
+      refine sum_congr rfl fun i _ => ?_
+      rw [intervalIntegral.integral_finsetSum (fun j _ => pairIntegrable i j)]
+      exact sum_congr rfl fun j _ => intervalIntegral.integral_const_mul _ _
+    _ ≤ _ := by
+      refine sum_le_sum fun i iMember => sum_le_sum fun j jMember => ?_
+      exact mul_le_mul_of_nonneg_left (awayBound n (g i) (g j) (l i) (r i) (l j) (r j) b bPositive
+        (gRange i iMember).1 (gRange j jMember).1 (gRange i iMember).2 (gRange j jMember).2
+        (rRange i iMember) (rRange j jMember)) (mul_nonneg (norm_nonneg _) (norm_nonneg _))
+
+/-- Reindex a double weighted pair sum by its step fibres. -/
+theorem sum_step_pairs {ι : Type*} (items : Finset ι) (steps : Finset ℕ)
+    (g : ι → ℕ) (weight : ι → ℝ) (F : ℕ → ℕ → ℝ) (mapsInto : ∀ i ∈ items, g i ∈ steps) :
+    (∑ i ∈ items, ∑ j ∈ items, weight i * weight j * F (g i) (g j)) =
+      ∑ u ∈ steps, ∑ v ∈ steps, (∑ i ∈ items.filter (fun i => g i = u), weight i) *
+        (∑ j ∈ items.filter (fun j => g j = v), weight j) * F u v := by
+  calc
+    _ = ∑ u ∈ steps, ∑ i ∈ items.filter (fun i => g i = u), ∑ j ∈ items, weight i * weight j * F (g i) (g j) :=
+      (sum_fiberwise_of_maps_to mapsInto _).symm
+    _ = ∑ u ∈ steps, ∑ v ∈ steps, ∑ i ∈ items.filter (fun i => g i = u),
+        ∑ j ∈ items.filter (fun j => g j = v), weight i * weight j * F (g i) (g j) := by
+      refine sum_congr rfl fun u _ => ?_
+      have inner (i : ι) : (∑ j ∈ items, weight i * weight j * F (g i) (g j)) =
+          ∑ v ∈ steps, ∑ j ∈ items.filter (fun j => g j = v), weight i * weight j * F (g i) (g j) :=
+        (sum_fiberwise_of_maps_to mapsInto _).symm
+      simp_rw [inner]
+      exact sum_comm
+    _ = _ := by
+      refine sum_congr rfl fun u _ => sum_congr rfl fun v _ => ?_
+      rw [sum_mul_sum, sum_mul]
+      refine sum_congr rfl fun i iMember => ?_
+      rw [sum_mul]
+      refine sum_congr rfl fun j jMember => ?_
+      rw [(mem_filter.mp iMember).2, (mem_filter.mp jMember).2]
+
+/-- Weighted offWave second-moment bound with per-step weight concentration `W`.
+    Parameters `M`, `b`, `W` are explicit; no band-position constants enter. -/
+theorem offWave_mass_le_weighted {ι : Type*} (items : Finset ι) (n M : ℕ) (b W : ℝ)
+    (MPositive : 0 < M) (MBound : M ≤ n) (bPositive : 0 < b) (WNonnegative : 0 ≤ W)
+    (g l r : ι → ℕ) (c : ι → ℂ) (gRange : ∀ i ∈ items, 0 < g i ∧ g i ≤ M)
+    (rRange : ∀ i ∈ items, r i ≤ n / g i)
+    (weightBound : ∀ u ∈ Icc 1 M, (∑ i ∈ items.filter (fun i => g i = u), ‖c i‖) ≤ W) :
+    (∫ t in (0 : ℝ)..1, ‖∑ i ∈ items, c i * offWave b (g i) (l i) (r i) t‖ ^ 2) ≤
+      128 * W ^ 2 * ((M : ℝ) ^ 2 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 +
+        b⁻¹ * (1 + Real.log (M : ℝ)) ^ 3) := by
+  let J := (1 + Real.log ((n : ℝ) + 2)) ^ 2
+  let F (u v : ℕ) : ℝ := 128 * (J + (u.gcd v : ℝ) / ((u : ℝ) * (v : ℝ) * b))
+  have mapsInto (i : ι) (member : i ∈ items) : g i ∈ Icc 1 M := mem_Icc.mpr (gRange i member)
+  have first := offWave_mass_le_pairwise items n b bPositive g l r c
+    (fun i member => ⟨(gRange i member).1, (gRange i member).2.trans MBound⟩) rRange
+  change _ ≤ ∑ i ∈ items, ∑ j ∈ items, ‖c i‖ * ‖c j‖ * F (g i) (g j) at first
+  rw [sum_step_pairs items (Icc 1 M) g (fun i => ‖c i‖) F mapsInto] at first
+  have positiveF (u v : ℕ) : 0 ≤ F u v := by unfold F J; positivity
+  have pairBound : (∑ u ∈ Icc 1 M, ∑ v ∈ Icc 1 M,
+      (∑ i ∈ items.filter (fun i => g i = u), ‖c i‖) *
+        (∑ j ∈ items.filter (fun j => g j = v), ‖c j‖) * F u v) ≤
+      ∑ u ∈ Icc 1 M, ∑ v ∈ Icc 1 M, W ^ 2 * F u v := by
+    refine sum_le_sum fun u uMember => sum_le_sum fun v vMember => ?_
+    rw [pow_two]
+    exact mul_le_mul_of_nonneg_right
+      (mul_le_mul (weightBound u uMember) (weightBound v vMember)
+        (sum_nonneg (fun _ _ => norm_nonneg _)) WNonnegative) (positiveF u v)
+  refine (first.trans pairBound).trans ?_
+  have expand (u v : ℕ) : W ^ 2 * F u v =
+      128 * W ^ 2 * (J + b⁻¹ * ((u.gcd v : ℝ) / ((u : ℝ) * (v : ℝ)))) := by
+    unfold F
+    ring
+  simp_rw [expand, ← mul_sum]
+  apply mul_le_mul_of_nonneg_left _ (by positivity)
+  have cardinality : (Icc 1 M).card = M := by simp
+  simp only [sum_add_distrib, sum_const, cardinality, nsmul_eq_mul, ← mul_sum]
+  have gcdBound := gcd_reciprocal_sum_le M MPositive
+  have constantTerm : (M : ℝ) * ((M : ℝ) * J) = (M : ℝ) ^ 2 * J := by ring
+  rw [constantTerm]
+  exact add_le_add_right (mul_le_mul_of_nonneg_left gcdBound (by positivity)) _
+
+end GoldbachB1B1OffWave
