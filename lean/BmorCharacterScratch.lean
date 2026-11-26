@@ -1642,7 +1642,7 @@ theorem logDerivative_term_positive {q : ℕ} [NeZero q]
     rw [h0,h1,h2]
     simp only [Complex.ofReal_re,Complex.mul_re,Complex.ofReal_im,zero_mul,sub_zero]
     have h := mul_nonneg ha (trigonometric_polynomial_nonnegative z hz)
-    linarith only [h]
+    nlinarith only [h]
   · simp [LSeries.term_of_ne_zero hk,twistCoeff,MulChar.map_nonunit _ hu]
 
 theorem logDerivative_positive_combination {q : ℕ} [NeZero q]
@@ -1687,7 +1687,8 @@ theorem zero_free_gap_from_positive_combination
     (hB : B ≤ -(1/(1+1/(16*K)-β))+K/8)
     (hC : C ≤ K/8) :
     β ≤ 1-1/(256*K) := by
-  have hden : 0 < 1+1/(16*K)-β := by positivity [sub_pos.mpr hβ]
+  have hstep : 0 < 1/(16*K) := by positivity
+  have hden : 0 < 1+1/(16*K)-β := by linarith only [hstep, hβ]
   have htotal : 4/(1+1/(16*K)-β) ≤ 49*K := by linarith
   have hprod := (div_le_iff₀ hden).mp htotal
   have hmul : (49*K)*(1+1/(16*K)-β) =
