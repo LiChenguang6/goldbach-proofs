@@ -7513,3 +7513,250 @@ theorem tau1_atom_sum (n m : ℕ) (hm : m ≤ n) :
         sum_filter (s := lowAtomSet n) (p := fun p => p.1 * p.2 = m) (f := lowAtomWeight n)
 
 end GoldbachB1B1LowAtoms
+
+namespace GoldbachB1B1Split
+
+open Finset Complex MeasureTheory
+open scoped BigOperators
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry DyadicMixedB4ArcCenters
+open GoldbachB1B1Polynomial GoldbachB1B1Adapt GoldbachB1B1Scale
+
+noncomputable section
+
+-- ===========================================================================
+-- Measurability / integrability helpers (ref L6559, L6581)
+-- ===========================================================================
+
+-- SOURCE: ref L6559 `wide_measurable`
+-- DIFF: renamed `b1B1_wide_measurable`; body unchanged.
+theorem b1B1_wide_measurable (n B H : ℕ) : MeasurableSet (wide n B H) := by
+  unfold wide
+  simp only [Set.ofPred_exists]
+  refine MeasurableSet.iUnion fun q => MeasurableSet.iUnion fun a => ?_
+  by_cases condition : 1 ≤ q ∧ q ≤ B ∧ a ≤ q ∧ a.Coprime q
+  · obtain ⟨qPositive, qBound, aBound, coprime⟩ := condition
+    simp only [qPositive, qBound, aBound, true_and]
+    have equality : {x : ℝ | a.Coprime q ∧ |x - (a : ℝ) / q| ≤ (H : ℝ) / ((q : ℝ) * n)} =
+        {x : ℝ | |x - (a : ℝ) / q| ≤ (H : ℝ) / ((q : ℝ) * n)} := by
+      ext x
+      exact ⟨And.right, And.intro coprime⟩
+    rw [equality]
+    exact measurableSet_le (f := fun t : ℝ => |t - (a : ℝ) / q|)
+      (g := fun _ : ℝ => (H : ℝ) / ((q : ℝ) * n)) (by fun_prop) measurable_const
+  · have empty : {t : ℝ | 1 ≤ q ∧ q ≤ B ∧ a ≤ q ∧ a.Coprime q ∧
+        |t - (a : ℝ) / q| ≤ (H : ℝ) / ((q : ℝ) * n)} = ∅ := by
+      ext t
+      simp
+      tauto
+    rw [empty]
+    exact MeasurableSet.empty
+
+-- SOURCE: ref L6581 `indicator_intervalIntegrable`
+-- DIFF: renamed `b1B1_indicator_intervalIntegrable`; body unchanged.
+theorem b1B1_indicator_intervalIntegrable {f : ℝ → ℂ} {s : Set ℝ}
+    (continuous : Continuous f) (measurable : MeasurableSet s) :
+    IntervalIntegrable (s.indicator f) volume 0 1 := by
+  rw [intervalIntegrable_iff_integrableOn_Ioc_of_le zero_le_one]
+  have h : IntegrableOn f (Set.Ioc 0 1) volume :=
+    continuous.continuousOn.integrableOn_Icc.mono_set Set.Ioc_subset_Icc_self
+  exact h.indicator measurable
+
+-- ===========================================================================
+-- Disjoint partition: `outside = (outside ∩ nearᶜ) ∪ (outside ∩ near)`
+-- ===========================================================================
+
+-- SOURCE: ref L6635/L6645 pointwise split; extracted as a standalone set lemma.
+-- DIFF: no reference counterpart as a separate theorem; this is the required
+--       "outside splits into off-near and near-cell" identity, proved first so
+--       the per-wave integral split can reuse it.
+theorem b1B1_outside_near_partition (outside near : Set ℝ) :
+    outside = (outside ∩ nearᶜ) ∪ (outside ∩ near) ∧
+      Disjoint (outside ∩ nearᶜ) (outside ∩ near) := by
+  refine ⟨?_, ?_⟩
+  · ext t
+    by_cases hnear : t ∈ near <;> simp [hnear, and_or_left, or_and_right] <;> tauto
+  · rw [Set.disjoint_left]
+    intro x hx1 hx2
+    exact hx1.2 hx2.2
+
+-- SOURCE: ref L6635 `offEqual`
+-- DIFF: renamed `b1B1_off_indicator_eq`; `off = nearᶜ.indicator f` supplied
+--       explicitly as `hoff`.
+theorem b1B1_off_indicator_eq (outside near : Set ℝ) (f off : ℝ → ℂ)
+    (hoff : off = nearᶜ.indicator f) :
+    outside.indicator off = (outside ∩ nearᶜ).indicator f := by
+  funext t
+  by_cases nearMem : t ∈ near <;> by_cases outsideMem : t ∈ outside <;>
+    simp [hoff, nearMem, outsideMem, Set.indicator_of_mem, Set.indicator_of_notMem]
+
+-- ===========================================================================
+-- Per-wave shifted-polynomial split (ref L6616 `split_shifted_wave`)
+-- ===========================================================================
+
+/-!
+Conclusion (low×low constants):
+
+```
+∫ t in (0:ℝ)..1, (wide n (BB n) (BH n))ᶜ.indicator
+    (shiftedPolynomial n a * wave g l r)
+=
+∫ t in (0:ℝ)..1, (wide n (BB n) (BH n))ᶜ.indicator
+    (shiftedPolynomial n a * offWave (radius (BM n)) g l r)
++
+Σ q ∈ g.divisors.filter (BR n < q), Σ m ∈ range (n+1),
+    a m * ramanujan q ((m:ℤ)-n) *
+      ∫ t in window n (BM n) (BB n) (BH n) q,
+        phase (((m:ℤ)-(n:ℤ):ℤ):ℝ * t) * wave g l r t
+```
+-/
+
+-- SOURCE: ref L6616 `split_shifted_wave`
+-- DIFF: constants `maximumStep→BM n`, `cutoffB→BB n`, `cutoffH→BH n`,
+--       `cutoffR→BR n`; the near-cell Ramanujan/q expansion is delegated to
+--       Port `centered_deep_wave_integral` (Stack L877), which internally
+--       closes via `deep_cell_indicator` (Stack L694).
+theorem b1B1_split_shifted_wave (n M B H R g l r : ℕ) (a : ℕ → ℂ)
+    (nPositive : 0 < n) (gPositive : 0 < g) (gBound : g ≤ M) (Bbound : B ≤ M)
+    (width : 4 * H * M ≤ n) (Rpositive : 1 ≤ R) (Rbound : R ≤ B)
+    (cover : (R : ℝ) * (n : ℝ) * radius M ≤ (H : ℝ)) :
+    (∫ t in (0 : ℝ)..1, (wide n B H)ᶜ.indicator
+        (fun x => shiftedPolynomial n a x * wave g l r x) t) =
+      (∫ t in (0 : ℝ)..1, (wide n B H)ᶜ.indicator
+          (fun x => shiftedPolynomial n a x * offWave (radius M) g l r x) t) +
+        ∑ q ∈ g.divisors.filter (fun q => R < q), ∑ m ∈ range (n + 1),
+          a m * ramanujan q ((m : ℤ) - n) *
+            ∫ t in window n M B H q,
+              phase ((((m : ℤ) - (n : ℤ) : ℤ) : ℝ) * t) * wave g l r t := by
+  classical
+  let near := gridNear (radius M) g
+  let outside := (wide n B H)ᶜ
+  let f (t : ℝ) := shiftedPolynomial n a t * wave g l r t
+  let off (t : ℝ) := shiftedPolynomial n a t * offWave (radius M) g l r t
+  let v (m : ℕ) (t : ℝ) :=
+    phase ((((m : ℤ) - (n : ℤ) : ℤ) : ℝ) * t) * wave g l r t
+  have waveContinuous : Continuous (wave g l r) := by
+    unfold wave phase
+    fun_prop
+  have fContinuous : Continuous f :=
+    (shiftedPolynomial_continuous n a).mul waveContinuous
+  have nearMeasurable : MeasurableSet near := gridNear_measurable (radius M) g
+  have outsideMeasurable : MeasurableSet outside := (b1B1_wide_measurable n B H).compl
+  have offEqual : outside.indicator off = (outside ∩ nearᶜ).indicator f := by
+    funext t
+    by_cases hout : t ∈ outside
+    · by_cases hnear : t ∈ near
+      · have hnc : t ∉ nearᶜ := by simpa [Set.mem_compl] using hnear
+        have hWave0 : offWave (radius M) g l r t = 0 :=
+          Set.indicator_of_notMem hnc (f := wave g l r)
+        have hoff : off t = 0 := by simp only [off, hWave0, mul_zero]
+        have z : outside.indicator off t = 0 := by
+          simp only [Set.indicator, hoff, if_pos hout, mul_zero]
+        have hni : t ∉ outside ∩ nearᶜ := fun h => hnc h.2
+        have z' : (outside ∩ nearᶜ).indicator f t = 0 :=
+          Set.indicator_of_notMem hni (f := f)
+        rw [z, z']
+      · have hnc : t ∈ nearᶜ := by simpa [Set.mem_compl] using hnear
+        have hWave : offWave (radius M) g l r t = wave g l r t :=
+          Set.indicator_of_mem hnc (f := wave g l r)
+        have hoff : off t = f t := by simp only [off, f, hWave]
+        have a : outside.indicator off t = f t := by
+          rw [Set.indicator_of_mem hout (f := off), hoff]
+        have hmem : t ∈ outside ∩ nearᶜ := ⟨hout, hnc⟩
+        have b : (outside ∩ nearᶜ).indicator f t = f t :=
+          Set.indicator_of_mem hmem (f := f)
+        rw [a, b]
+    · have hni : t ∉ outside ∩ nearᶜ := fun h => hout h.1
+      have z : outside.indicator off t = 0 := Set.indicator_of_notMem hout (f := off)
+      have z' : (outside ∩ nearᶜ).indicator f t = 0 :=
+        Set.indicator_of_notMem hni (f := f)
+      rw [z, z']
+  have offInt : IntervalIntegrable (outside.indicator off) volume 0 1 := by
+    rw [offEqual]
+    exact b1B1_indicator_intervalIntegrable fContinuous
+      (outsideMeasurable.inter nearMeasurable.compl)
+  have nearInt : IntervalIntegrable ((near ∩ outside).indicator f) volume 0 1 :=
+    b1B1_indicator_intervalIntegrable fContinuous (nearMeasurable.inter outsideMeasurable)
+  have split (t : ℝ) : outside.indicator f t =
+      outside.indicator off t + (near ∩ outside).indicator f t := by
+    rw [offEqual]
+    by_cases nearMem : t ∈ near <;> by_cases outsideMem : t ∈ outside <;>
+      simp [nearMem, outsideMem]
+  have expandNear (t : ℝ) : (near ∩ outside).indicator f t =
+      ∑ m ∈ range (n + 1), a m * (near ∩ outside).indicator (v m) t := by
+    by_cases membership : t ∈ near ∩ outside
+    · simp only [Set.indicator_of_mem membership, f, shiftedPolynomial, sum_mul, v,
+        mul_assoc]
+    · simp [membership]
+  have termInt (m : ℕ) :
+      IntervalIntegrable (fun t => a m * (near ∩ outside).indicator (v m) t) volume 0 1 := by
+    have continuousMode : Continuous (fun t : ℝ =>
+      phase ((((m : ℤ) - (n : ℤ) : ℤ) : ℝ) * t)) := by
+      unfold phase
+      fun_prop
+    exact (b1B1_indicator_intervalIntegrable (continuousMode.mul waveContinuous)
+      (nearMeasurable.inter outsideMeasurable)).const_mul (a m)
+  change (∫ t in (0 : ℝ)..1, outside.indicator f t) =
+      (∫ t in (0 : ℝ)..1, outside.indicator off t) + _
+  calc
+    _ = ∫ t in (0 : ℝ)..1, outside.indicator off t + (near ∩ outside).indicator f t :=
+      intervalIntegral.integral_congr fun t _ => split t
+    _ = (∫ t in (0 : ℝ)..1, outside.indicator off t) +
+        ∫ t in (0 : ℝ)..1, (near ∩ outside).indicator f t :=
+      intervalIntegral.integral_add offInt nearInt
+    _ = _ := by
+      congr 1
+      simp_rw [expandNear]
+      rw [intervalIntegral.integral_finsetSum (fun m _ => termInt m)]
+      simp_rw [intervalIntegral.integral_const_mul]
+      have identify (m : ℕ) : (∫ t in (0 : ℝ)..1, (near ∩ outside).indicator (v m) t) =
+          ∑ q ∈ g.divisors.filter (fun q => R < q), ramanujan q ((m : ℤ) - n) *
+            ∫ t in window n M B H q, v m t :=
+        centered_deep_wave_integral n M B H R g l r ((m : ℤ) - n)
+          nPositive gPositive gBound Bbound width Rpositive Rbound cover
+      simp_rw [identify, mul_sum]
+      rw [sum_comm]
+      simp only [v, mul_assoc]
+
+-- ===========================================================================
+-- Top-level atom-list split (abstract; ref L7143 `deepPairIntegral_split`)
+-- ===========================================================================
+
+/-!
+The reference sums the per-wave split over `highAtoms n`, carrying
+`atomWeight i` through both the off integral and the near atom sum. In the
+low×low Stack the atom list is not wired yet (placeholder L6913); this lemma
+is therefore parameterized over an item type `ι` with step/interval accessors
+and weights. Concretely:
+- `items`  : wave atoms (per alternative (C), divisor-side `a`; see MainBlock Q3);
+- `step i`/`lo i`/`hi i`: wave step and window indices;
+- `weight i`: outer atom weight.
+
+NEEDS: object wiring — replace the abstract `items`/accessors with the real
+low×low atom expansion once it lands in Stack.
+-/
+
+-- SOURCE: ref L7143 `deepPairIntegral_split`
+-- DIFF: abstracted over `ι`/`step`/`lo`/`hi`/`weight`; no reference to the
+--       unwired `deepPairIntegral`/`outsidePairIntegral`/`exactNearPair`
+--       placeholders. The per-wave identity is `b1B1_split_shifted_wave` above.
+theorem b1B1_deepPair_split_aux {ι : Type*} (n M B H R : ℕ)
+    (items : Finset ι) (step lo hi : ι → ℕ) (weight : ι → ℝ)
+    (a : ℕ → ℂ) (nPositive : 0 < n)
+    (gBound : ∀ i ∈ items, step i ≤ M) (Bbound : B ≤ M)
+    (width : 4 * H * M ≤ n) (Rpositive : 1 ≤ R) (Rbound : R ≤ B)
+    (cover : (R : ℝ) * (n : ℝ) * radius M ≤ (H : ℝ)) :
+    True := by
+  -- TODO: wire the atom-list integral split.
+  -- 1. For each `i ∈ items`, apply `b1B1_split_shifted_wave` with
+  --    `g := step i`, `l := lo i`, `r := hi i`.
+  -- 2. Sum the per-item off integrals into the outside-pair integral; sum the
+  --    per-item near atom sums (`Σ q, Σ m, a m · ramanujan q · window integral`)
+  --    into the near-pair sum, mirroring ref L7195–7199
+  --    (`integral_finsetSum` over `items`, `integral_const_mul` for weights).
+  -- 3. State the equality against the real low×low outside/near pair objects
+  --    once those replace the Stack L6910–6913 zero placeholders.
+  trivial
+
+end
+
+end GoldbachB1B1Split
