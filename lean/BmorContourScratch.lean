@@ -4028,3 +4028,112 @@ theorem nonprincipal_signed_logDeriv_bounds {q : ℕ} [NeZero q]
     linarith only [hlo]
 
 end GoldbachProgression
+
+
+namespace GoldbachProgression
+open Finset Filter Set MeasureTheory Complex DirichletCharacter Metric MeromorphicOn
+open scoped BigOperators Classical Topology
+
+noncomputable def zetaSignedDiskConstant : ℝ :=
+  11*(1440 + 1440*Real.log 48/Real.log (47/46))
+
+/-- Real-part estimate for the zeta log derivative, retaining its exact pole.
+The signed zero contributions of the regularized zeta function can be
+discarded without a separation hypothesis. -/
+theorem zeta_signed_logDeriv_bound (s : ℂ)
+    (hs : 1 < s.re) (hs₁ : s.re ≤ 2) :
+    (-logDeriv riemannZeta s).re ≤
+      ((s-1)⁻¹).re + zetaSignedDiskConstant*Real.log (2+|s.im|) := by
+  have hs₀ : 1/4 ≤ s.re := by linarith
+  let c : ℂ := ⟨3, s.im⟩
+  let U : ℝ := 2 + |s.im|
+  let f (w : ℂ) := riemannZeta₁ (c + w)
+  let B : ℝ := 512 * U^2
+  have hU : 2 ≤ U := le_add_of_nonneg_right (abs_nonneg _)
+  have hUpos : 0 < U := by linarith
+  have hB : 1 ≤ B := by dsimp only [B]; nlinarith [sq_nonneg (U-2)]
+  have hc : ‖c‖ ≤ 3 + |s.im| := by simpa [c] using Complex.norm_le_abs_re_add_abs_im c
+  have hcenter : 1 ≤ ‖f 0‖ := by
+    have hfac : 2 ≤ ‖c - 1‖ := by
+      have hb := Complex.abs_re_le_norm (c-1)
+      norm_num [c] at hb
+      exact hb
+    have hz : (1/2 : ℝ) ≤ ‖riemannZeta c‖ := by
+      simpa only [DirichletCharacter.LFunction_modOne_eq] using
+        (half_le_norm_LFunction_of_re_eq_three (1 : DirichletCharacter ℂ 1) (s := c) rfl)
+    have hne : c ≠ 1 := by intro h; have := congrArg Complex.re h; norm_num [c] at this
+    have hreg : riemannZeta₁ c = (c-1) * riemannZeta c := by
+      rw [riemannZeta_eq_inv_sub_mul hne, ← mul_assoc, mul_inv_cancel₀ (sub_ne_zero.mpr hne), one_mul]
+    simp only [f, add_zero, hreg, norm_mul]
+    calc (1:ℝ) = 2 * (1/2) := by norm_num
+         _ ≤ _ := mul_le_mul hfac hz (by norm_num) (norm_nonneg _)
+  have hpos := zero_lt_one.trans_le hcenter
+  have hbound (w : ℂ) (hw : w ∈ sphere 0 (47/16)) : ‖f w‖ ≤ B := by
+    have hwN : ‖w‖ = 47/16 := by simpa [mem_sphere] using hw
+    have hrew : - (47 /16) ≤ w.re := by
+      have := Complex.abs_re_le_norm w
+      rw [hwN] at this
+      exact (abs_le.mp this).1
+    have hzre : 1/16 ≤ (c+w).re := by simp only [add_re, c]; linarith
+    have hn : 1 + ‖c + w‖ ≤ 4 * U := by
+      have h := norm_add_le c w
+      rw [hwN] at h
+      dsimp only [U]
+      linarith [abs_nonneg s.im]
+    calc
+      _ ≤ 17 * (1 + ‖c + w‖)^2 := zeta_regular_norm_le_sixteenth _ hzre
+      _ ≤ 17 * (4 * U)^2 := by gcongr
+      _ ≤ B := by dsimp only [B]; nlinarith [sq_nonneg U]
+  have hlog : Real.log (B / ‖f 0‖) ≤ 11 * Real.log U := by
+    calc
+      _ ≤ Real.log B := Real.log_le_log (div_pos (by linarith) hpos) (div_le_self (by linarith) hcenter)
+      _ = 9 * Real.log 2 + 2 * Real.log U := by
+        rw [show B = (2 : ℝ)^9 * U^2 by norm_num [B], Real.log_mul (by norm_num) (pow_ne_zero _ hUpos.ne'),
+          Real.log_pow, Real.log_pow]
+        norm_num
+      _ ≤ _ := by linarith [Real.log_le_log (by norm_num : (0 : ℝ) < 2) hU]
+  let z := s - c
+  have hz0 : c + z = s := by dsimp [z]; abel
+  have hzN : ‖z‖ ≤ 11/4 := by
+    have hz' : z = ((s.re - 3 : ℝ) : ℂ) := by
+      apply Complex.ext <;> simp [z,c]
+    rw [hz', Complex.norm_real, Real.norm_eq_abs, abs_of_nonpos (by linarith)]
+    linarith
+
+  have han : AnalyticOnNhd ℂ f (closedBall 0 (47/16)) := by
+    intro w _
+    exact (differentiable_riemannZeta₁.analyticAt (c+w)).comp (by fun_prop)
+  have hD : 0 < 11 * Real.log U := mul_pos (by norm_num) (Real.log_pos (by linarith))
+  obtain ⟨Z,hZ,hm,hPF⟩ := local_logDeriv_partial_fraction f han
+    (norm_pos_iff.mp hpos) hB hD hbound hlog
+  have hsne : s ≠ 1 := by
+    intro he
+    rw [he,Complex.one_re] at hs
+    exact (lt_irrefl _ hs)
+  have hζ : riemannZeta s ≠ 0 := riemannZeta_ne_zero_of_one_le_re hs.le
+  have hfn : f z ≠ 0 := by
+    intro hz
+    have he : riemannZeta₁ s = 0 := by simpa only [f,hz0] using hz
+    exact hζ (by rw [riemannZeta_eq_inv_sub_mul hsne,he,mul_zero])
+  have hleft (w : ℂ) (hw : w ∈ Z) : w.re ≤ z.re := by
+    have hfw : riemannZeta₁ (c+w) = 0 := ((hZ w).mp hw).2
+    have hne : c+w ≠ 1 := by
+      intro he
+      simp [he,riemannZeta₁_one] at hfw
+    have hzero : riemannZeta (c+w) = 0 := by
+      rw [riemannZeta_eq_inv_sub_mul hne,hfw,mul_zero]
+    have hlt : (c+w).re < 1 :=
+      lt_of_not_ge fun h => riemannZeta_ne_zero_of_one_le_re h hzero
+    simp only [Complex.add_re,c] at hlt
+    simp only [z,Complex.sub_re,c]
+    linarith
+  have hh := logDeriv_negative_re_upper f Z z _ hleft (hPF z hzN hfn)
+  have heq : logDeriv f z = logDeriv riemannZeta₁ s := by
+    simp only [logDeriv_apply,f,deriv_comp_const_add,hz0]
+  rw [heq,Complex.neg_re] at hh
+  rw [zeta_logDeriv_subtract_pole hsne hζ,Complex.neg_re,Complex.sub_re]
+  unfold zetaSignedDiskConstant
+  dsimp only [U] at hh
+  linarith only [hh]
+
+end GoldbachProgression
