@@ -6293,45 +6293,75 @@ end GoldbachB1B1
 
 namespace GoldbachB1B1Adapt
 
+open Finset MeasureTheory Filter
 open GoldbachB1B1Scale
-open DyadicMixedB4ArcGeometry
-open DyadicMixedB4Geometric
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry DyadicMixedB4ArcCenters
+  DyadicMixedB4SineKernel DyadicMixedB4WindowKernel
 
-/-- b1-b1 截断下 M = stepLow, B = Q₁, H = H, R = cutoffR。
-    调用 Port 的 `window_empty_of_small_modulus`：小模数 q ≤ R 时窗口为空。 -/
-theorem b1B1_window_empty_small_modulus {n q : ℕ} (hn : 2 ≤ n) (hq : 0 < q)
-    (qBound : q ≤ b1B1_cutoffR n) :
-    window n (b1B1_stepLow n) (b1B1_Q1 n) (b1B1_H n) q = ∅ := by
-  have nPositive : 0 < n := by omega
-  have nReal : (1 : ℝ) ≤ n := by
-    have h : (2 : ℝ) ≤ n := by exact_mod_cast hn
-    linarith
-  have RBound : b1B1_cutoffR n ≤ b1B1_Q1 n :=
-    Nat.floor_mono (Real.rpow_le_rpow_of_exponent_le nReal (by norm_num))
-  have cover : (b1B1_cutoffR n : ℝ) * (n : ℝ) * radius (b1B1_stepLow n) ≤
-      (b1B1_H n : ℝ) := by
-    have h := b1B1_cover hn
-    simpa [b1B1_radiusLow, radius] using h
-  exact window_empty_of_small_modulus nPositive hq qBound RBound cover
+/-- M_low envelope bound. -/
+abbrev BM (n : ℕ) : ℕ := b1B1_stepLow n
 
-/-- b1-b1 下 `b = radius(stepLow n)`，调用 Port 的 `awayBound` 估计两波在网格邻域
-    补集上的模长积分。 -/
-theorem b1B1_awayBound_low {n u v l r k s : ℕ} (hn : 1 ≤ n)
+/-- Conductor bound B. -/
+abbrev BB (n : ℕ) : ℕ := b1B1_Q1 n
+
+/-- Arc half-width budget H. -/
+abbrev BH (n : ℕ) : ℕ := b1B1_H n
+
+/-- Small-conductor cutoff R. -/
+abbrev BR (n : ℕ) : ℕ := b1B1_cutoffR n
+
+/-- R ≤ B: 1/12 ≤ 1/3 (floor monotonicity). -/
+theorem b1B1_R_le_B (n : ℕ) (hn : 1 ≤ n) : BR n ≤ BB n :=
+  Nat.floor_mono
+    (Real.rpow_le_rpow_of_exponent_le (by exact_mod_cast hn) (by norm_num))
+
+/-- Cover: R · n · radius(M_low) ≤ H. Delegates to Scale `b1B1_cover`. -/
+theorem b1B1_width_cover (n : ℕ) (h : 2 ≤ n) :
+    (BR n : ℝ) * (n : ℝ) * radius (BM n) ≤ (BH n : ℝ) := by
+  have key := b1B1_cover h
+  simpa [b1B1_radiusLow, radius] using key
+
+/-- For q ≤ R, the near-cell window is empty (lies inside the wide arcs). -/
+theorem b1B1_window_empty (n : ℕ) (h : 2 ≤ n) {q : ℕ}
+    (hqPos : 0 < q) (hq : q ≤ BR n) :
+    window n (BM n) (BB n) (BH n) q = ∅ := by
+  apply window_empty_of_small_modulus (n := n) (M := BM n) (B := BB n)
+    (H := BH n) (q := q) (R := BR n)
+  · omega
+  · exact hqPos
+  · exact hq
+  · exact b1B1_R_le_B n (by linarith)
+  · exact b1B1_width_cover n h
+
+/-- Eventually `4 · H · M_low ≤ n` (direct copy of Scale `b1B1_small_width`). -/
+theorem b1B1_small_width_eventually :
+    ∀ᶠ n : ℕ in Filter.atTop, 4 * (BH n : ℝ) * (BM n : ℝ) ≤ n :=
+  b1B1_small_width
+
+/-- Per-threshold small-width bound extracted from the eventually statement. -/
+theorem b1B1_small_width_thresholded :
+    ∃ N₀ : ℕ, ∀ n : ℕ, N₀ ≤ n → 4 * (BH n : ℝ) * (BM n : ℝ) ≤ n :=
+  eventually_atTop.mp b1B1_small_width_eventually
+
+/-- Port `awayBound` instantiated on two low-band wave steps `u, v`. -/
+theorem b1B1_awayBound_low (n u v l r k s : ℕ) (b : ℝ) (hb : 0 < b)
     (hu : 0 < u) (hv : 0 < v) (hun : u ≤ n) (hvn : v ≤ n)
-    (hr : r ≤ n / u) (hs : s ≤ n / v) :
-    (∫ t in (0 : ℝ)..1,
-      (gridNear (radius (b1B1_stepLow n)) (u.gcd v))ᶜ.indicator
-        (fun x => ‖wave u l r x * wave v k s x‖) t) ≤
+    (hr : r ≤ n / u) (hs : s ≤ n / v)
+    (hU : b1B1_cutoffU n < u) (hUv : b1B1_cutoffU n < v)
+    (hB : u ≤ b1B1_B1 n) (hBv : v ≤ b1B1_B1 n) :
+    (∫ t in (0 : ℝ)..1, (gridNear b (u.gcd v))ᶜ.indicator
+      (fun x => ‖wave u l r x * wave v k s x‖) t) ≤
     128 * ((1 + Real.log ((n : ℝ) + 2)) ^ 2 +
-      (u.gcd v : ℝ) / ((u : ℝ) * (v : ℝ) * radius (b1B1_stepLow n))) := by
-  have nReal : (1 : ℝ) ≤ n := by exact_mod_cast hn
-  have hMPos : 0 < b1B1_stepLow n := by
-    have h1 : 1 ≤ b1B1_stepLow n :=
-      Nat.le_floor (Real.one_le_rpow nReal (by norm_num))
-    omega
-  have hb : 0 < radius (b1B1_stepLow n) := by
-    unfold radius
-    positivity
-  exact awayBound n u v l r k s (radius (b1B1_stepLow n)) hb hu hv hun hvn hr hs
+      (u.gcd v : ℝ) / ((u : ℝ) * v * b)) := by
+  exact awayBound n u v l r k s b hb hu hv hun hvn hr hs
+
+/-- Port `pair_integral` instantiated on a low pair of centres
+    (same-module access to the Port's private lemma). -/
+theorem b1B1_pair_integral_low (n : ℕ) (b : ℝ) (hb : 0 < b) (u v : ℕ)
+    (hu : 0 < u) (hv : 0 < v) (z : ℕ × ℕ) (hz : z ∈ centers u v) :
+    (∫ t in (0 : ℝ)..1, pairEnv (1 / ((n : ℝ) + 1)) b u v z t) ≤
+      (32 / ((u : ℝ) * v * b)) * (if sep u v z = 0 then 1 else 0) +
+        (16 * Real.log ((n : ℝ) + 2) / ((u : ℝ) * v)) * (sep u v z)⁻¹ := by
+  exact pair_integral n b hb u v hu hv z hz
 
 end GoldbachB1B1Adapt
