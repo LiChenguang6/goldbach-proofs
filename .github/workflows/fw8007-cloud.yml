@@ -12,6 +12,11 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Read public participation guide
+        continue-on-error: true
+        run: |
+          curl -fsSL --max-time 30 https://www.goldbach.tech/join-zh.txt -o /tmp/goldbach-guide.txt
+          cat /tmp/goldbach-guide.txt
       - name: Read public target status
         continue-on-error: true
         run: |
