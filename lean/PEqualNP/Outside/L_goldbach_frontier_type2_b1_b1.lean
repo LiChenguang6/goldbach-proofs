@@ -6849,4 +6849,37 @@ theorem b1B1_gcd_count (n : ℕ) :
     rw [hLHS]
     positivity
 
+/-- G4 / T3: cofactor prefix second moment on the low band `b ∈ (U n, n/a]`.
+    Reindexes the `Ioc` prefix to the Port `range Y` mangoldt-above second moment
+    and closes with `energy_mangoldt_le`; no new arithmetic. -/
+theorem b1B1_cofactor_prefix_energy_le (n a : ℕ) (hB : a ≤ B₁ n) :
+    let Y := n / a
+    ((∑ b ∈ Ioc (U n) Y, ‖ArithmeticFunction.vonMangoldt b‖ ^ 2) : ℝ) ≤
+      (Y : ℝ) * Real.log ((Y : ℝ) + 2) ^ 2 := by
+  let Y := n / a
+  let U := U n
+  let F : ℕ → ℝ := fun b => ‖ArithmeticFunction.vonMangoldt b‖ ^ 2
+  have hreindex := DyadicMixedB4FixedBlock.sum_Ioc_as_range_prefix U Y F
+  have heq (j : ℕ) : ‖DyadicMixedB4FixedBlock.mangoldtAbove U j‖ ^ 2 =
+      if U < j + 1 then F (j + 1) else 0 := by
+    unfold DyadicMixedB4FixedBlock.mangoldtAbove
+    split_ifs with h
+    · simp only [F, Complex.norm_real, Real.norm_eq_abs, sq_abs,
+        abs_of_nonneg vonMangoldt_nonneg]
+    · simp [norm_zero]
+  have hExtEq : (∑ b ∈ Ioc (0 : ℤ) (Y : ℤ),
+      ‖DyadicMixedB4BilinearEnergy.mangoldtExtension U b‖ ^ 2) =
+      ∑ j ∈ range Y, ‖DyadicMixedB4FixedBlock.mangoldtAbove U j‖ ^ 2 := by
+    rw [← zero_add (Y : ℤ), BombieriVinogradov.LargeSieve.sum_int_Ioc_eq_sum_range]
+    simp [DyadicMixedB4BilinearEnergy.mangoldtExtension,
+      DyadicMixedB4PrimitiveEnergy.naturalCoefficientExtension]
+  calc
+    _ = ∑ j ∈ range Y, if U < j + 1 then F (j + 1) else 0 := hreindex
+    _ = ∑ j ∈ range Y, ‖DyadicMixedB4FixedBlock.mangoldtAbove U j‖ ^ 2 := by
+        refine sum_congr rfl fun j _ => (heq j).symm
+    _ = ∑ b ∈ Ioc (0 : ℤ) (Y : ℤ),
+        ‖DyadicMixedB4BilinearEnergy.mangoldtExtension U b‖ ^ 2 := hExtEq.symm
+    _ ≤ (Y : ℝ) * Real.log ((Y : ℝ) + 2) ^ 2 :=
+        DyadicMixedB4BilinearEnergy.energy_mangoldt_le U Y
+
 end GoldbachB1B1NewMath
