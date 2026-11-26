@@ -1727,7 +1727,7 @@ theorem absoluteTwistCoeff_term {q : ℕ} (χ : DirichletCharacter ℂ q)
     simp
   have hk' : (0:ℝ) < k := by exact_mod_cast Nat.pos_of_ne_zero hk
   rw [LSeries.term_of_ne_zero hk, LSeries.norm_term_eq, if_neg hk, absoluteTwistCoeff]
-  rw [Complex.ofReal_re, Complex.ofReal_div, ← Complex.ofReal_cpow hk'.le,
+  rw [Complex.ofReal_re, Complex.ofReal_div, Complex.ofReal_cpow hk'.le,
     Complex.ofReal_natCast]
 
 theorem absoluteTwist_LSeries_bound {q : ℕ} [NeZero q]
@@ -1762,8 +1762,11 @@ theorem absoluteTwist_LSeries_bound {q : ℕ} [NeZero q]
       _ ≤ ((Real.log 4+4)*t)*t^(-(c+1)) :=
         mul_le_mul_of_nonneg_right hsum (Real.rpow_nonneg ht'.le _)
       _ = _ := by
-        rw [mul_assoc, ← Real.rpow_one t, ← Real.rpow_add ht']
-        norm_num [show 1 + -(c+1) = -c by ring]
+        rw [mul_assoc]
+        congr 1
+        calc
+          t * t^(-(c+1)) = t^(1:ℝ) * t^(-(c+1)) := by rw [Real.rpow_one]
+          _ = t^(-c) := by rw [← Real.rpow_add ht']; congr 1; ring
   rw [integral_const_mul, integral_Ioi_rpow_of_lt (a := -c) (by linarith)
     (by norm_num : (0:ℝ)<1), Real.one_rpow] at hb
   have he : (Real.log 4+4)*(-1/(-c+1)) = (Real.log 4+4)/(c-1) := by
@@ -1836,7 +1839,10 @@ theorem perron_near_one_tail_bound {q : ℕ} [NeZero q]
   dsimp only
   let c := 1+1/Real.log x
   let D := Real.exp 1*x*(Real.log 4+4)*(1+Real.log x)
-  have hD : 0 ≤ D := by dsimp [D]; positivity
+  have hD : 0 ≤ D := by
+    dsimp [D]
+    have hl : 0 < Real.log x := Real.log_pos hx
+    positivity
   have hi := (integrableOn_Ioi_rpow_of_lt (by norm_num : (-2:ℝ)< -1) hT).const_mul D
   change ‖∫ t in Set.Ioi T, perronKernel x c t * _‖ ≤ D/T
   calc
