@@ -8739,14 +8739,14 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
     exact e1a.trans <| mul_le_mul_of_nonneg_left hA128 SPos.le
   have hWb : W ^ 2 * bracket ≤ W' ^ 2 * bracket :=
     mul_le_mul_of_nonneg_right hW2 hb
-  have hW128 : 128 * W ^ 2 * bracket ≤ 128 * W' ^ 2 * bracket :=
-    mul_le_mul_of_nonneg_left hWb (by positivity)
+  have hW128 : (128 : ℝ) * (W ^ 2 * bracket) ≤ (128 : ℝ) * (W' ^ 2 * bracket) :=
+    mul_le_mul (by norm_num) hWb (by positivity) (by norm_num)
   have e2 : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
       (b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket) := by
     have e2a : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
         (b1B1_outsideScale n)⁻¹ * (128 * W ^ 2 * bracket) :=
       mul_le_mul_of_nonneg_left Gbound (inv_nonneg.mpr SPos.le)
-    exact e2a.trans <| mul_le_mul_of_nonneg_left hW128 (by positivity)
+    exact e2a.trans <| mul_le_mul_of_nonneg_left hW128 (inv_nonneg.mpr SPos.le)
   have main : (1 / 2 : ℝ) *
       ((b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) +
         ((b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2)) ≤
