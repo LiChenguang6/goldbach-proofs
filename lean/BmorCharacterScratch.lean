@@ -29,8 +29,7 @@ theorem psiAP_character_expansion {q : ℕ} [NeZero q] (a n : ℕ)
       apply Finset.sum_congr rfl
       intro k hk
       simp only [ArithmeticFunction.vonMangoldt.residueClass, Set.indicator_apply,
-        Set.mem_setOf_eq, ZMod.natCast_eq_natCast_iff']
-      split_ifs <;> simp_all
+        Set.mem_ofPred_eq, ZMod.natCast_eq_natCast_iff']
     _ = ∑ k ∈ Finset.range (n+1),
         ((q.totient : ℂ)⁻¹ *
           ∑ χ : DirichletCharacter ℂ q,
@@ -40,15 +39,12 @@ theorem psiAP_character_expansion {q : ℕ} [NeZero q] (a n : ℕ)
       intro k hk
       exact ArithmeticFunction.vonMangoldt.residueClass_apply hu k
     _ = _ := by
-      simp only [psiTwist, ← Finset.mul_sum, ← Finset.sum_mul, mul_assoc]
-      rw [← Finset.mul_sum, Finset.sum_comm]
+      simp only [psiTwist, ← Finset.mul_sum, mul_assoc]
+      rw [Finset.sum_comm]
       apply congrArg (fun z : ℂ => (q.totient : ℂ)⁻¹ * z)
       apply Finset.sum_congr rfl
       intro χ hχ
       rw [Finset.mul_sum]
-      apply Finset.sum_congr rfl
-      intro k hk
-      ring
 
 /- Center the character sum by subtracting the trivial-character main term. -/
 noncomputable def characterError {q : ℕ} [NeZero q] (a n : ℕ)
