@@ -4137,3 +4137,263 @@ theorem zeta_signed_logDeriv_bound (s : ℂ)
   linarith only [hh]
 
 end GoldbachProgression
+
+
+namespace GoldbachProgression
+open Finset Filter Set MeasureTheory Complex DirichletCharacter ArithmeticFunction
+open scoped BigOperators Classical Topology
+
+/- Reuse the positivity lemmas from our verified BmorCharacterScratch
+   in this single-file development. -/
+noncomputable def twistCoeff {q : ℕ} (χ : DirichletCharacter ℂ q) (k : ℕ) : ℂ :=
+  χ (k : ZMod q) * (ArithmeticFunction.vonMangoldt k : ℂ)
+
+theorem twistLSeries_eq_logDeriv {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
+    (s : ℂ) (hs : 1 < s.re) :
+    LSeries (twistCoeff χ) s =
+      -deriv (DirichletCharacter.LFunction χ) s / DirichletCharacter.LFunction χ s := by
+  rw [χ.deriv_LFunction_eq_deriv_LSeries hs, χ.LFunction_eq_LSeries hs]
+  exact DirichletCharacter.LSeries_twist_vonMangoldt_eq χ hs
+
+theorem trigonometric_polynomial_nonnegative (z : ℂ) (hz : ‖z‖ = 1) :
+    0 ≤ 3 + 4*z.re + (z^2).re := by
+  rw [pow_two, Complex.mul_re]
+  have h := Complex.sq_norm z
+  rw [hz, Complex.normSq_apply] at h
+  nlinarith [sq_nonneg (z.re+1)]
+
+theorem logDerivative_term_positive {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (σ t : ℝ) (k : ℕ) :
+    0 ≤ 3 * (LSeries.term (twistCoeff (1 : DirichletCharacter ℂ q))
+        (σ:ℂ) k).re +
+      4 * (LSeries.term (twistCoeff χ) ((σ:ℂ)+Complex.I*(t:ℂ)) k).re +
+      (LSeries.term (twistCoeff (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ)) k).re := by
+  by_cases hk : k = 0
+  · subst k
+    simp
+  have hk' : 0 < (k:ℝ) := by exact_mod_cast Nat.pos_of_ne_zero hk
+  by_cases hu : IsUnit (k : ZMod q)
+  · let z : ℂ := χ (k:ZMod q) * (k:ℂ)^(-(Complex.I*(t:ℂ)))
+    let a : ℝ := ArithmeticFunction.vonMangoldt k * (k:ℝ)^(-σ)
+    have ha : 0 ≤ a := mul_nonneg ArithmeticFunction.vonMangoldt_nonneg
+      (Real.rpow_nonneg hk'.le _)
+    have hz : ‖z‖ = 1 := by
+      unfold z
+      rw [norm_mul, ← hu.unit_spec, χ.unit_norm_eq_one hu.unit, one_mul]
+      rw [← Complex.ofReal_natCast k, Complex.norm_cpow_eq_rpow_re_of_pos hk']
+      simp [Complex.mul_re]
+    have h0 : LSeries.term (twistCoeff (1 : DirichletCharacter ℂ q))
+        (σ:ℂ) k = (a:ℂ) := by
+      rw [LSeries.term_of_ne_zero hk, twistCoeff, MulChar.one_apply hu, one_mul,
+        div_eq_mul_inv, ← Complex.cpow_neg]
+      simp [a, Complex.ofReal_mul, Complex.ofReal_cpow hk'.le]
+    have h1 : LSeries.term (twistCoeff χ) ((σ:ℂ)+Complex.I*(t:ℂ)) k =
+        (a:ℂ)*z := by
+      rw [LSeries.term_of_ne_zero hk, twistCoeff, div_eq_mul_inv, ← Complex.cpow_neg,
+        neg_add, Complex.cpow_add _ _ (by exact_mod_cast hk)]
+      simp only [a,z,Complex.ofReal_mul,Complex.ofReal_cpow hk'.le,
+        Complex.ofReal_natCast,Complex.ofReal_neg]
+      ring
+    have h2 : LSeries.term (twistCoeff (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ)) k =
+        (a:ℂ)*z^2 := by
+      rw [LSeries.term_of_ne_zero hk, twistCoeff, div_eq_mul_inv, ← Complex.cpow_neg,
+        neg_add, Complex.cpow_add _ _ (by exact_mod_cast hk),
+        χ.pow_apply' two_ne_zero,
+        show -(2*Complex.I*(t:ℂ)) = (2:ℕ)*(-(Complex.I*(t:ℂ))) by push_cast; ring,
+        Complex.cpow_nat_mul]
+      simp only [a,z,Complex.ofReal_mul,Complex.ofReal_cpow hk'.le,
+        Complex.ofReal_natCast,Complex.ofReal_neg]
+      ring
+    rw [h0,h1,h2]
+    simp only [Complex.ofReal_re,Complex.mul_re,Complex.ofReal_im,zero_mul,sub_zero]
+    have h := mul_nonneg ha (trigonometric_polynomial_nonnegative z hz)
+    nlinarith only [h]
+  · simp [LSeries.term_of_ne_zero hk,twistCoeff,MulChar.map_nonunit _ hu]
+
+theorem logDerivative_positive_combination {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (σ t : ℝ) (hσ : 1 < σ) :
+    0 ≤ 3 * (-deriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q))
+          (σ:ℂ) / DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q) (σ:ℂ)).re +
+      4 * (-deriv (DirichletCharacter.LFunction χ) ((σ:ℂ)+Complex.I*(t:ℂ)) /
+          DirichletCharacter.LFunction χ ((σ:ℂ)+Complex.I*(t:ℂ))).re +
+      (-deriv (DirichletCharacter.LFunction (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ)) /
+          DirichletCharacter.LFunction (χ^2) ((σ:ℂ)+2*Complex.I*(t:ℂ))).re := by
+  have hs0 : 1 < (σ:ℂ).re := hσ
+  have hs1 : 1 < ((σ:ℂ)+Complex.I*(t:ℂ)).re := by
+    simpa [Complex.add_re,Complex.mul_re] using hσ
+  have hs2 : 1 < ((σ:ℂ)+2*Complex.I*(t:ℂ)).re := by
+    simpa [Complex.add_re,Complex.mul_re] using hσ
+  rw [← twistLSeries_eq_logDeriv _ _ hs0, ← twistLSeries_eq_logDeriv _ _ hs1,
+    ← twistLSeries_eq_logDeriv _ _ hs2]
+  have h0 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt
+    (1 : DirichletCharacter ℂ q) hs0
+  have h1 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt χ hs1
+  have h2 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt (χ^2) hs2
+  change Summable (LSeries.term (twistCoeff (1 : DirichletCharacter ℂ q)) (σ:ℂ)) at h0
+  change Summable (LSeries.term (twistCoeff χ) ((σ:ℂ)+Complex.I*(t:ℂ))) at h1
+  change Summable (LSeries.term (twistCoeff (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ))) at h2
+  unfold LSeries
+  rw [Complex.re_tsum h0,Complex.re_tsum h1,Complex.re_tsum h2,
+    ← tsum_mul_left, ← tsum_mul_left,
+    ← ((Complex.hasSum_re h0.hasSum).summable.mul_left 3).tsum_add
+      ((Complex.hasSum_re h1.hasSum).summable.mul_left 4),
+    ← (((Complex.hasSum_re h0.hasSum).summable.mul_left 3).add
+      ((Complex.hasSum_re h1.hasSum).summable.mul_left 4)).tsum_add
+      (Complex.hasSum_re h2.hasSum).summable]
+  exact tsum_nonneg (logDerivative_term_positive χ σ t)
+
+theorem zero_free_gap_from_positive_combination
+    (β K A B C : ℝ) (hβ : β < 1) (hK : 0 < K)
+    (hpos : 0 ≤ 3*A+4*B+C)
+    (hA : A ≤ 16*K+K/8)
+    (hB : B ≤ -(1/(1+1/(16*K)-β))+K/8)
+    (hC : C ≤ K/8) :
+    β ≤ 1-1/(256*K) := by
+  have hstep : 0 < 1/(16*K) := by positivity
+  have hden : 0 < 1+1/(16*K)-β := by linarith only [hstep, hβ]
+  have htotal' : 4 * (1/(1+1/(16*K)-β)) ≤ 49*K := by linarith only [hpos,hA,hB,hC]
+  have htotal : 4/(1+1/(16*K)-β) ≤ 49*K := by
+    simpa only [mul_one_div] using htotal'
+  have hprod := (div_le_iff₀ hden).mp htotal
+  have hmul : (49*K)*(1+1/(16*K)-β) =
+      49*K*(1-β)+49/16 := by
+    field_simp [hK.ne']
+    <;> ring
+  rw [hmul] at hprod
+  have hlow : (1:ℝ)/256 ≤ K*(1-β) := by nlinarith only [hprod]
+  have h := (div_le_iff₀ hK).2 (show 1/256 ≤ (1-β)*K by
+    simpa [mul_comm] using hlow)
+  rw [div_div] at h
+  linarith only [h]
+
+theorem principal_negLogDeriv_le_zeta {q : ℕ} [NeZero q]
+    (σ : ℝ) (hσ : 1 < σ) :
+    (-logDeriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q)) (σ:ℂ)).re ≤
+      (-logDeriv riemannZeta (σ:ℂ)).re := by
+  have hs : 1 < (σ:ℂ).re := hσ
+  simp only [logDeriv_apply,neg_div]
+  rw [← twistLSeries_eq_logDeriv _ _ hs,
+    ← ArithmeticFunction.LSeries_vonMangoldt_eq_deriv_riemannZeta_div hs]
+  have h1 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt
+    (1 : DirichletCharacter ℂ q) hs
+  change Summable (LSeries.term (twistCoeff (1 : DirichletCharacter ℂ q)) (σ:ℂ)) at h1
+  have h2 := ArithmeticFunction.LSeriesSummable_vonMangoldt hs
+  unfold LSeries
+  rw [Complex.re_tsum h1,Complex.re_tsum h2]
+  apply Summable.tsum_le_tsum _ (Complex.hasSum_re h1.hasSum).summable
+    (Complex.hasSum_re h2.hasSum).summable
+  intro k
+  by_cases hk : k = 0
+  · subst k
+    simp
+  have hk' : (0:ℝ) < k := by exact_mod_cast Nat.pos_of_ne_zero hk
+  by_cases hu : IsUnit (k:ZMod q)
+  · simp [LSeries.term_of_ne_zero hk,twistCoeff,MulChar.one_apply hu]
+  · rw [LSeries.term_of_ne_zero hk,twistCoeff,MulChar.map_nonunit _ hu,
+      zero_mul,zero_div,Complex.zero_re,LSeries.term_of_ne_zero hk]
+    change 0 ≤ ((vonMangoldt k:ℂ)/(k:ℂ)^(σ:ℂ)).re
+    rw [← Complex.ofReal_natCast k,← Complex.ofReal_cpow hk'.le,← Complex.ofReal_div,
+      Complex.ofReal_re]
+    exact div_nonneg vonMangoldt_nonneg (Real.rpow_nonneg hk'.le _)
+
+theorem principal_signed_logDeriv_bound {q : ℕ} [NeZero q]
+    (σ : ℝ) (hσ : 1 < σ) (hs2 : σ ≤ 2) :
+    (-logDeriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q)) (σ:ℂ)).re ≤
+      1/(σ-1) + zetaSignedDiskConstant*Real.log 2 := by
+  apply (principal_negLogDeriv_le_zeta σ hσ).trans
+  have h := zeta_signed_logDeriv_bound (σ:ℂ) hσ hs2
+  rw [← Complex.ofReal_one,← Complex.ofReal_sub,← Complex.ofReal_inv,Complex.ofReal_re,
+    Complex.ofReal_im,abs_zero,add_zero,← one_div] at h
+  exact h
+
+noncomputable def explicitNonquadraticK (q : ℕ) (t : ℝ) : ℝ :=
+  8*(signedDiskConstant+zetaSignedDiskConstant+1)*Real.log ((q:ℝ)*(2+2*|t|))
+
+/-- Attempt a quantitative zero-free region for nonquadratic characters.
+    The constants are coarse and do not yet give BMOR's numerical result. -/
+theorem nonquadratic_explicit_zero_free {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hχ₂ : χ^2 ≠ 1) (ρ : ℂ)
+    (hzero : χ.LFunction ρ = 0) (hρ : 1/2 ≤ ρ.re) :
+    ρ.re ≤ 1-1/(256*explicitNonquadraticK q ρ.im) := by
+  let t := ρ.im
+  let L := Real.log ((q:ℝ)*(2+2*|t|))
+  let K := explicitNonquadraticK q t
+  have hχ : χ ≠ 1 := by
+    intro h
+    apply hχ₂
+    simp [h]
+  have hβ : ρ.re < 1 := by
+    by_contra! h
+    exact (χ.LFunction_ne_zero_of_one_le_re (.inl hχ) h) hzero
+  have hq : (1:ℝ) ≤ q := by exact_mod_cast (Nat.pos_of_ne_zero (NeZero.ne q))
+  have hD : 0 ≤ signedDiskConstant := by
+    unfold signedDiskConstant
+    positivity
+  have hZ : 0 ≤ zetaSignedDiskConstant := by
+    unfold zetaSignedDiskConstant
+    positivity
+  have hL2 : Real.log 2 ≤ L := by
+    dsimp [L]
+    apply Real.log_le_log (by norm_num)
+    exact (by linarith [abs_nonneg t] : (2:ℝ) ≤ 2+2*|t|).trans
+      (le_mul_of_one_le_left (by positivity) hq)
+  have hL : 1/2 ≤ L := by linarith only [hL2,Real.log_two_gt_d9]
+  have hKdef : K = 8*(signedDiskConstant+zetaSignedDiskConstant+1)*L := rfl
+  have hK : 1 ≤ K := by
+    rw [hKdef]
+    nlinarith [mul_nonneg (show 0 ≤ signedDiskConstant+zetaSignedDiskConstant by linarith)
+      (show 0 ≤ L by linarith)]
+  have hKpos : 0 < K := by linarith
+  have hcostD : signedDiskConstant*L ≤ K/8 := by
+    rw [hKdef]
+    nlinarith [mul_nonneg hZ (show 0 ≤ L by linarith)]
+  have hcostZ : zetaSignedDiskConstant*Real.log 2 ≤ K/8 := by
+    apply (mul_le_mul_of_nonneg_left hL2 hZ).trans
+    rw [hKdef]
+    nlinarith [mul_nonneg hD (show 0 ≤ L by linarith)]
+  let σ := 1+1/(16*K)
+  have hσ : 1 < σ := by dsimp [σ]; linarith [one_div_pos.mpr (show 0 < 16*K by positivity)]
+  have hσ₂ : σ ≤ 2 := by
+    dsimp [σ]
+    have h : 1/(16*K) ≤ 1 := (div_le_iff₀ (by positivity : 0 < 16*K)).2 (by linarith)
+    linarith
+  let s := (σ:ℂ)+Complex.I*(t:ℂ)
+  let s₂ := (σ:ℂ)+2*Complex.I*(t:ℂ)
+  have hs : s.re = σ := by simp [s,Complex.mul_re]
+  have hsi : s.im = t := by simp [s,Complex.mul_im]
+  have hs₂ : s₂.re = σ := by simp [s₂,Complex.mul_re]
+  have hs₂i : s₂.im = 2*t := by simp [s₂,Complex.mul_im]
+  have hlog : Real.log ((q:ℝ)*(2+|t|)) ≤ L := by
+    dsimp [L]
+    apply Real.log_le_log (by positivity)
+    gcongr
+    linarith [abs_nonneg t]
+  have hlog₂ : Real.log ((q:ℝ)*(2+|2*t|)) = L := by
+    dsimp [L]
+    rw [abs_mul,abs_of_nonneg (by norm_num : (0:ℝ)≤2)]
+  have ha := principal_signed_logDeriv_bound (q:=q) σ hσ hσ₂
+  have hAscale : 1/(σ-1) = 16*K := by
+    dsimp [σ]
+    rw [add_sub_cancel_left]
+    simp [one_div]
+  rw [hAscale] at ha
+  have hb := (nonprincipal_signed_logDeriv_bounds χ hχ s (by rwa [hs]) (by rwa [hs])).2
+    ρ hρ (by rw [hsi]) hzero
+  rw [hs,hsi] at hb
+  have hc := (nonprincipal_signed_logDeriv_bounds (χ^2) hχ₂ s₂
+    (by rwa [hs₂]) (by rwa [hs₂])).1
+  rw [hs₂i,hlog₂] at hc
+  have hp := logDerivative_positive_combination χ σ t hσ
+  have hp' : 0 ≤
+      3*(-logDeriv (DirichletCharacter.LFunction (1:DirichletCharacter ℂ q)) (σ:ℂ)).re +
+      4*(-logDeriv χ.LFunction s).re + (-logDeriv (χ^2).LFunction s₂).re := by
+    simpa only [logDeriv_apply,neg_div,s,s₂] using hp
+  have H := zero_free_gap_from_positive_combination ρ.re K _ _ _ hβ hKpos hp'
+    (by linarith only [ha,hcostZ])
+    (by have hh := (mul_le_mul_of_nonneg_left hlog hD).trans hcostD
+        dsimp only [σ] at hb
+        linarith only [hb,hh])
+    (hc.trans hcostD)
+  exact H
+
+end GoldbachProgression
