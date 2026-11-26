@@ -1,0 +1,62 @@
+name: BMOR character and conditional reductions
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [test/lean-fw8007-cloud]
+permissions:
+  contents: read
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read public participation guide
+        continue-on-error: true
+        run: |
+          curl -fsSL --max-time 30 https://www.goldbach.tech/join-zh.txt -o /tmp/goldbach-guide.txt
+          cat /tmp/goldbach-guide.txt
+      - name: Read public target status
+        continue-on-error: true
+        run: |
+          curl -fsSL --max-time 30 https://www.movan.tech/goldbach/api/status -o /tmp/goldbach-status.json
+          python - <<'PY'
+          import json
+          def visit(x):
+              if isinstance(x, dict):
+                  if x.get("id") == "L-goldbach-fixed-ap-bmor-psi" or x.get("gap_id") == "L-goldbach-fixed-ap-bmor-psi":
+                      print(json.dumps(x))
+                  if "L-goldbach-fixed-ap-bmor-psi" in x:
+                      print(json.dumps(x["L-goldbach-fixed-ap-bmor-psi"]))
+                  for v in x.values(): visit(v)
+              elif isinstance(x, list):
+                  for v in x: visit(v)
+          status = json.load(open("/tmp/goldbach-status.json"))
+          visit(status)
+          print("OPEN_COUNTS", status.get("counts"))
+          for g in status.get("gaps", []):
+              if g.get("proved") is False:
+                  print("OPEN_GAP", g["id"], (g.get("latest") or {}).get("verdict"))
+          PY
+      - name: Install Elan
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Fetch pinned Mathlib and cache
+        working-directory: lean
+        run: |
+          lean --version
+          lake exe cache get
+      - name: Check conditional reduction only
+        working-directory: lean
+        run: lake env lean BmorReductionScratch.lean
+      - name: Check finite character expansion
+        if: always()
+        working-directory: lean
+        run: lake env lean BmorCharacterScratch.lean
+
+      - name: Check GRH-free finite-rectangle bridge
+        if: always()
+        working-directory: lean
+        run: lake env lean BmorContourScratch.lean
