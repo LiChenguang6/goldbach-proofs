@@ -8879,8 +8879,9 @@ theorem b1B1_primitive_budget_le (n : ℕ) (nLower : 2 ≤ n)
     {T : ℝ} (TLower : 1 ≤ T) :
     (16 * (B₁ n : ℝ) * T ^ 3 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) *
       ((BM n : ℝ) * (T * logBudget n)) ≤ 160 * finalScale n T := by
-  have nPositive : 0 < (n : ℝ) := by exact_mod_cast nLower
+  have nPositive : 0 < (n : ℝ) := by omega
   have hn : 1 ≤ (n : ℝ) := by exact_mod_cast nLower
+  have hnNat : 1 ≤ n := by omega
   have BNonneg : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
   have hB1 : (B₁ n : ℝ) ≤ (n : ℝ) ^ (1 / 4 : ℝ) := Nat.floor_le (by positivity)
   have hBM : (BM n : ℝ) ≤ (n : ℝ) ^ (2 / 5 : ℝ) := b1B1_stepLow_le_power n
@@ -8889,7 +8890,8 @@ theorem b1B1_primitive_budget_le (n : ℕ) (nLower : 2 ≤ n)
       _ ≤ (n : ℝ) ^ (1 / 4 : ℝ) * (n : ℝ) ^ (2 / 5 : ℝ) :=
         mul_le_mul hB1 hBM (by positivity) (by positivity)
       _ = (n : ℝ) ^ (13 / 20 : ℝ) := by
-        rw [← Real.rpow_add nPositive]; ring
+        rw [← Real.rpow_add nPositive]
+        norm_num
   have nPow : (n : ℝ) ^ (13 / 20 : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
     Real.rpow_le_rpow_of_exponent_le hn (by norm_num)
   have length2 : (B₁ n : ℝ) * (BM n : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
@@ -8901,7 +8903,7 @@ theorem b1B1_primitive_budget_le (n : ℕ) (nLower : 2 ≤ n)
       _ = 2 * T ^ 5 := by ring
   have hNat : (Nat.log 2 n : ℝ) ≤ 5 * logBudget n :=
     b1B1_prim_natLog_le nLower (by omega)
-  have hLog : Real.log n ≤ logBudget n := b1B1_prim_log_le_logBudget hn
+  have hLog : Real.log n ≤ logBudget n := b1B1_prim_log_le_logBudget hnNat
   have hlogNonneg : 0 ≤ Real.log n := Real.log_nonneg hn
   have hlogProd : (Nat.log 2 n : ℝ) * Real.log n ≤ 5 * logBudget n * logBudget n :=
     mul_le_mul hNat hLog hlogNonneg (by positivity)
