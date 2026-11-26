@@ -213,11 +213,13 @@ theorem zeroCountPrimitive_hasDerivAt (d t : ℝ) (hd : 0 < d) (ht : 0 < t) :
       (hasDerivAt_id t) ht.ne')
   unfold zeroCountPrimitive
   convert hh using 1
-  try simp only [id_eq]
-  rw [show Real.exp 1*d*t = Real.exp 1*(d*t) by ring,
-    Real.log_mul he.ne' (mul_pos hd ht).ne', Real.log_exp]
-  field_simp
-  <;> ring
+  · funext x
+    rfl
+  · simp only [id_eq, Nat.cast_ofNat, show (2 : ℕ) - 1 = 1 by decide, pow_one]
+    rw [show Real.exp 1*d*t = Real.exp 1*(d*t) by ring,
+      Real.log_mul he.ne' (mul_pos hd ht).ne', Real.log_exp]
+    field_simp [hd.ne', ht.ne', hp.ne', he.ne']
+    <;> ring
 
 
 /- BMOR Proposition 2.5 upper envelope and the integral comparison
