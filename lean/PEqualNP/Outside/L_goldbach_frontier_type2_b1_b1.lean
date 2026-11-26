@@ -8026,7 +8026,28 @@ theorem b1B1_norm_sum_windowKernel_difference_le (n M B H q g l r : ℕ) [NeZero
       ∑ m ∈ range (n + 1), a m * ramanujan q ((m : ℤ) - n) *
         (windowKernel n M B H q g l r ((m : ℝ) - (n : ℝ)) : ℝ)‖ ≤
       (A * (2 * Real.pi * (2 * radius M))) * ((q.divisors.card : ℝ) * ((n : ℝ) + q)) := by
-  sorry
+  let C := 2 * Real.pi * (2 * radius M)
+  have heq (m : ℕ) : ((m : ℝ) - (n : ℝ)) = (((m : ℤ) - (n : ℤ) : ℤ) : ℝ) := by
+    push_cast; ring
+  simp only [heq]
+  rw [← sum_sub_distrib]
+  simp only [← mul_sub]
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ m ∈ range (n + 1), (A * C) * ‖ramanujan q ((m : ℤ) - n)‖ := by
+      refine sum_le_sum fun m membership => ?_
+      simp only [norm_mul]
+      rw [mul_right_comm]
+      exact mul_le_mul_of_nonneg_right
+        (mul_le_mul (aBound m membership)
+          (b1B1_norm_windowKernel_difference_le n M B H q g l r
+            (((m : ℤ) - (n : ℤ) : ℤ) : ℝ) gPositive radiusBound)
+          (norm_nonneg _) ANonnegative) (norm_nonneg _)
+    _ = (A * C) * ∑ m ∈ range (n + 1), ‖ramanujan q ((m : ℤ) - n)‖ :=
+      (mul_sum _ _ _).symm
+    _ ≤ _ := mul_le_mul_of_nonneg_left (sum_norm_shifted_ramanujan_le qLower n)
+      (mul_nonneg ANonnegative (by dsimp [C]; exact mul_nonneg (by positivity)
+        (mul_nonneg (by norm_num) (radius_nonnegative M))))
 
 -- ======================================================================
 -- 3. Atom weight bound (atom side, single `T`)
