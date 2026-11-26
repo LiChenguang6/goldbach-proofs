@@ -489,9 +489,7 @@ theorem changeLevel_twist_difference {d q : ℕ} (hd : d ∣ q)
   apply Finset.sum_congr rfl
   intro k hk
   rw [changeLevel_apply_nat hd χ k]
-  by_cases hc : Nat.Coprime k q
-  · simp only [hc, ite_true, not_true_eq_false, ite_false, sub_self]
-  · simp only [hc, ite_false, not_false_eq_true, ite_true, zero_mul, sub_zero]
+  split_ifs <;> simp_all
 
 theorem changeLevel_twist_bound {d q : ℕ} [NeZero d] (hd : d ∣ q)
     (χ : DirichletCharacter ℂ d) (n : ℕ) :
@@ -669,7 +667,11 @@ theorem bmor_of_primitive_budget
     exact DirichletCharacter.card_eq_totient_of_hasEnoughRootsOfUnity ℂ q
   have hD' : D = B/100 := by
     dsimp [D, B]
-    ring_nf
+    have hlog : Real.log (n:ℝ) ≠ 0 := (Real.log_pos
+      (by have hn' : (8000000000:ℝ) ≤ (n:ℝ) := by exact_mod_cast hn
+          linarith)).ne'
+    field_simp [hlog]
+    <;> ring
   have hH := H q n hq hq' hn
   change (∑ χ : DirichletCharacter ℂ q, ‖centeredTwist χ n‖) ≤ (q.totient:ℝ)*B
   calc
@@ -746,12 +748,11 @@ theorem logPowerTailIntegral_bound (d m a b : ℝ) (hd : 1≤d) (hm : 0<m)
 theorem logPowerIntegrand_eq (d m t : ℝ) (ht : 0<t) :
     Real.log (d*t)*Real.exp (-m*Real.log t)/t =
       Real.log (d*t)/t^(m+1) := by
-  rw [Real.rpow_def_of_pos ht, ← Real.exp_log ht]
-  -- Use exponential addition and inverse laws; no asymptotic assumptions.
-  rw [show Real.log (Real.exp (Real.log t)) = Real.log t by rw [Real.log_exp]]
-  rw [show Real.log t*(m+1) = Real.log t + m*Real.log t by ring, Real.exp_add]
-  rw [show -m*Real.log t = -(m*Real.log t) by ring, Real.exp_neg]
-  field_simp
+  rw [Real.rpow_def_of_pos ht,
+    show Real.log t*(m+1) = Real.log t + m*Real.log t by ring,
+    Real.exp_add, Real.exp_log ht,
+    show -m*Real.log t = -(m*Real.log t) by ring, Real.exp_neg]
+  field_simp [ht.ne', (Real.exp_pos (m*Real.log t)).ne']
   <;> ring
 
 /- Appendix A.6: endpoint certificates on a finite range.  Monotonicity
