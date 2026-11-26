@@ -1319,8 +1319,8 @@ theorem perron_single_term (f : ℕ → ℂ) (x c : ℝ) (hx : 0 < x)
     rw [perronKernel, LSeries.term_of_ne_zero hk, Complex.ofReal_div,
       Complex.div_cpow_ofReal_nonneg hk'.le hx.le, Complex.cpow_neg, Complex.cpow_neg]
     push_cast
-    simp only [inv_inv]
-    ring
+    simp only [div_eq_mul_inv, mul_inv_rev, inv_inv]
+    <;> ring
   unfold mellinInv at hinv
   rw [show (∫ t : ℝ, perronKernel x c t *
       LSeries.term f ((c:ℂ)+(t:ℂ)*Complex.I) k) =
@@ -1490,7 +1490,7 @@ theorem thetaAP_mod_four_odd (n : ℕ) :
   apply Finset.sum_congr rfl
   intro k hk
   have hmod : k % 2 = 1 ↔ k % 4 = 1 ∨ k % 4 = 3 := by omega
-  simp only [Nat.reduceMod]
+  norm_num only [Nat.reduceMod]
   by_cases h1 : k % 4 = 1
   · have h2 : k % 2 = 1 := hmod.mpr (Or.inl h1)
     have h3 : k % 4 ≠ 3 := by omega
