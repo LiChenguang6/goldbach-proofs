@@ -8879,7 +8879,56 @@ theorem b1B1_primitive_budget_le (n : ℕ) (nLower : 2 ≤ n)
     {T : ℝ} (TLower : 1 ≤ T) :
     (16 * (B₁ n : ℝ) * T ^ 3 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) *
       ((BM n : ℝ) * (T * logBudget n)) ≤ 160 * finalScale n T := by
-  sorry
+  have nPositive : 0 < n := by omega
+  have hn : 1 ≤ n := by omega
+  have BNonneg : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
+  have TNonneg : 0 ≤ T := zero_le_one.trans TLower
+  have hB1 : (B₁ n : ℝ) ≤ (n : ℝ) ^ (1 / 4 : ℝ) := Nat.floor_le (by positivity)
+  have hBM : (BM n : ℝ) ≤ (n : ℝ) ^ (2 / 5 : ℝ) := b1B1_stepLow_le_power n
+  have length : (B₁ n : ℝ) * (BM n : ℝ) ≤ (n : ℝ) ^ (13 / 20 : ℝ) := by
+    calc
+      _ ≤ (n : ℝ) ^ (1 / 4 : ℝ) * (n : ℝ) ^ (2 / 5 : ℝ) :=
+        mul_le_mul hB1 hBM (by positivity) (by positivity)
+      _ = (n : ℝ) ^ (13 / 20 : ℝ) := by
+        rw [← Real.rpow_add nPositive]; ring
+  have nPow : (n : ℝ) ^ (13 / 20 : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
+    Real.rpow_le_rpow_of_exponent_le hn (by norm_num)
+  have length2 : (B₁ n : ℝ) * (BM n : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
+    length.trans nPow
+  have tPow : T ^ 4 * (1 + T) ≤ 2 * T ^ 5 := by
+    have h1 : 1 + T ≤ 2 * T := by linarith
+    calc
+      T ^ 4 * (1 + T) ≤ T ^ 4 * (2 * T) := mul_le_mul_of_nonneg_left h1 (by positivity)
+      _ = 2 * T ^ 5 := by ring
+  have hNat : (Nat.log 2 n : ℝ) ≤ 5 * logBudget n :=
+    b1B1_prim_natLog_le nLower (by omega)
+  have hLog : Real.log n ≤ logBudget n := b1B1_prim_log_le_logBudget hn
+  have hlogNonneg : 0 ≤ Real.log n := Real.log_nonneg (by linarith)
+  have hlogProd : (Nat.log 2 n : ℝ) * Real.log n ≤ 5 * logBudget n * logBudget n :=
+    mul_le_mul hNat hLog hlogNonneg BNonneg
+  have hB37 : logBudget n ^ 3 ≤ logBudget n ^ 7 :=
+    pow_le_pow_right₀ (one_le_logBudget n) (by decide : 3 ≤ 7)
+  have lPow : (Nat.log 2 n : ℝ) * Real.log n * logBudget n ≤ 5 * logBudget n ^ 7 := by
+    calc
+      _ ≤ (5 * logBudget n * logBudget n) * logBudget n :=
+        mul_le_mul_of_nonneg_right hlogProd BNonneg
+      _ = 5 * logBudget n ^ 3 := by ring
+      _ ≤ 5 * logBudget n ^ 7 := mul_le_mul_of_nonneg_left hB37 (by norm_num)
+  have hXY : ((B₁ n : ℝ) * (BM n : ℝ)) * (T ^ 4 * (1 + T)) ≤
+      (n : ℝ) ^ (23 / 24 : ℝ) * (2 * T ^ 5) :=
+    mul_le_mul length2 tPow (by positivity) (by positivity)
+  have hXYZ : ((B₁ n : ℝ) * (BM n : ℝ)) * (T ^ 4 * (1 + T)) *
+        ((Nat.log 2 n : ℝ) * Real.log n * logBudget n) ≤
+      (n : ℝ) ^ (23 / 24 : ℝ) * (2 * T ^ 5) * (5 * logBudget n ^ 7) :=
+    mul_le_mul hXY lPow (by positivity) (by positivity)
+  calc
+    (16 * (B₁ n : ℝ) * T ^ 3 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) *
+        ((BM n : ℝ) * (T * logBudget n))
+      = 16 * (((B₁ n : ℝ) * (BM n : ℝ)) * (T ^ 4 * (1 + T)) *
+          ((Nat.log 2 n : ℝ) * Real.log n * logBudget n)) := by ring
+    _ ≤ 16 * ((n : ℝ) ^ (23 / 24 : ℝ) * (2 * T ^ 5) * (5 * logBudget n ^ 7)) :=
+      mul_le_mul_of_nonneg_left hXYZ (by norm_num)
+    _ = 160 * finalScale n T := by unfold finalScale; ring
 
 -- ===========================================================================
 -- Abstract replacement bound over an item list
