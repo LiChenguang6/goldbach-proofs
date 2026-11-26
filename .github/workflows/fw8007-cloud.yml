@@ -1,4 +1,4 @@
-name: BMOR conditional reduction check
+name: BMOR character and conditional reductions
 on:
   pull_request:
     branches: [main]
@@ -24,3 +24,7 @@ jobs:
       - name: Check conditional reduction only
         working-directory: lean
         run: lake env lean BmorReductionScratch.lean
+      - name: Check finite character expansion
+        if: always()
+        working-directory: lean
+        run: lake env lean BmorCharacterScratch.lean
