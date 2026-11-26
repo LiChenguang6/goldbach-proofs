@@ -7036,3 +7036,132 @@ theorem b1B1_tau1_coeff_le (n m : ℕ) (mBound : m ≤ n) (nPositive : 0 < n) :
     _ = _ := by rw [sum_const, nsmul_eq_mul]; ring
 
 end GoldbachB1B1LowCoeff
+
+namespace GoldbachB1B1Budget
+
+open Finset Filter Real
+open GoldbachB1B1 GoldbachB1B1Scale GoldbachB1B1Adapt
+open DyadicMixedB4ArcGeometry DyadicMixedB4EnergyTail
+open GoldbachB1B1Assembly
+
+/-- Outside budget scale: `S = M_low / √n`. -/
+def b1B1_outsideScale (n : ℕ) : ℝ := (BM n : ℝ) / Real.sqrt n
+
+/-- `M_low ≥ 1`, for `n ≥ 1`. -/
+private theorem b1B1_stepLow_one_le {n : ℕ} (hn : 1 ≤ n) : 1 ≤ BM n :=
+  Nat.le_floor (Real.one_le_rpow (by exact_mod_cast hn) (by norm_num))
+
+/-- `M_low > 0` (real cast), for `n ≥ 1`. -/
+private theorem b1B1_stepLow_real_pos {n : ℕ} (hn : 1 ≤ n) : 0 < (BM n : ℝ) := by
+  have h : 1 ≤ BM n := b1B1_stepLow_one_le hn
+  exact_mod_cast h
+
+/-- `S > 0`. -/
+theorem b1B1_outsideScale_pos {n : ℕ} (hn : 1 ≤ n) : 0 < b1B1_outsideScale n :=
+  div_pos (b1B1_stepLow_real_pos hn) (Real.sqrt_pos_of_pos (by exact_mod_cast hn))
+
+/-- `1 + log M_low ≤ logBudget n`. -/
+theorem b1B1_one_add_log_step_le {n : ℕ} (hn : 1 ≤ n) :
+    1 + Real.log (BM n : ℝ) ≤ logBudget n := by
+  have mPos : 0 < (BM n : ℝ) := b1B1_stepLow_real_pos hn
+  have mLeN : (BM n : ℝ) ≤ n := by exact_mod_cast b1B1_stepLow_le_n hn
+  exact add_le_add_right (Real.log_le_log mPos (by linarith)) 1
+
+/-- `√n · M_low ≤ n^(9/10)` (1/2 + 2/5 = 9/10). -/
+theorem b1B1_sqrt_mul_stepLow_le {n : ℕ} (hn : 1 ≤ n) :
+    Real.sqrt n * (BM n : ℝ) ≤ (n : ℝ) ^ (9 / 10 : ℝ) := by
+  have nReal : (0 : ℝ) < n := by exact_mod_cast hn
+  calc
+    _ ≤ Real.sqrt n * (n : ℝ) ^ (2 / 5 : ℝ) :=
+      mul_le_mul_of_nonneg_left (b1B1_stepLow_le_power n) (Real.sqrt_nonneg _)
+    _ = (n : ℝ) ^ (9 / 10 : ℝ) := by
+      rw [Real.sqrt_eq_rpow, ← Real.rpow_add nReal]; ring
+
+/-- Far/outside budget: pure exponent arithmetic. Mirrors reference `outside_budget_le`,
+    adapted to the low×low step `M = BM n` and the `n^(23/24)` final scale
+    (9/10 ≤ 23/24, so the `√n · M` envelope is absorbed by `finalScale`). -/
+theorem b1B1_outside_budget_le {n : ℕ} (hn : 1 ≤ n) {T : ℝ} (TLower : 1 ≤ T) :
+    let A := T ^ 2 * logBudget n
+    let W := T * logBudget n
+    (1 / 2 : ℝ) * (b1B1_outsideScale n * (((n : ℝ) + 1) * A ^ 2) +
+      (b1B1_outsideScale n)⁻¹ * (128 * W ^ 2 * ((BM n : ℝ) ^ 2 * logBudget n ^ 2 +
+        (radius (BM n))⁻¹ * (1 + Real.log (BM n : ℝ)) ^ 3))) ≤
+      577 * finalScale n T := by
+  dsimp only
+  let A := T ^ 2 * logBudget n
+  let W := T * logBudget n
+  let B := logBudget n
+  let M := (BM n : ℝ)
+  let S := b1B1_outsideScale n
+  have mPos : 0 < M := b1B1_stepLow_real_pos hn
+  have nLower : (1 : ℝ) ≤ n := by exact_mod_cast hn
+  have nReal : (0 : ℝ) < n := by exact_mod_cast hn
+  have root : 0 < Real.sqrt n := Real.sqrt_pos_of_pos nReal
+  have SPos : 0 < S := b1B1_outsideScale_pos hn
+  have BLower : 1 ≤ B := one_le_logBudget n
+  have BNonneg : 0 ≤ B := zero_le_one.trans BLower
+  have TNonneg : 0 ≤ T := zero_le_one.trans TLower
+  have mOne : (1 : ℝ) ≤ (BM n : ℝ) := by
+    exact_mod_cast b1B1_stepLow_one_le hn
+  have HNonneg : 0 ≤ 1 + Real.log M :=
+    add_nonneg zero_le_one (Real.log_nonneg mOne)
+  have radiusInv : (radius (BM n))⁻¹ = 8 * M ^ 2 := by
+    unfold radius; rw [one_div, inv_inv]
+  have nDivSqrt : (n : ℝ) / Real.sqrt n = Real.sqrt n := by
+    apply (div_eq_iff root.ne').mpr
+    rw [← pow_two, Real.sq_sqrt nReal.le]
+  have first : S * (((n : ℝ) + 1) * A ^ 2) ≤ 2 * Real.sqrt n * M * A ^ 2 := by
+    calc
+      _ ≤ S * ((2 * (n : ℝ)) * A ^ 2) :=
+        mul_le_mul_of_nonneg_left
+          (mul_le_mul_of_nonneg_right (by linarith only [nLower]) (sq_nonneg _)) SPos.le
+      _ = _ := by
+        change (M / Real.sqrt n) * ((2 * (n : ℝ)) * A ^ 2) = _
+        calc
+          _ = 2 * ((n : ℝ) / Real.sqrt n) * M * A ^ 2 := by ring
+          _ = _ := by rw [nDivSqrt]
+  have inner : M ^ 2 * B ^ 2 + (radius (BM n))⁻¹ * (1 + Real.log M) ^ 3 ≤
+      9 * M ^ 2 * B ^ 3 := by
+    rw [radiusInv]
+    calc
+      _ ≤ M ^ 2 * B ^ 3 + (8 * M ^ 2) * B ^ 3 :=
+        add_le_add
+          (mul_le_mul_of_nonneg_left
+            (pow_le_pow_right₀ BLower (by decide : 2 ≤ 3)) (sq_nonneg _))
+          (mul_le_mul_of_nonneg_left
+            (pow_le_pow_left₀ HNonneg (b1B1_one_add_log_step_le hn) 3) (by positivity))
+      _ = _ := by ring
+  have second : S⁻¹ * (128 * W ^ 2 * (M ^ 2 * B ^ 2 + (radius (BM n))⁻¹ * (1 + Real.log M) ^ 3)) ≤
+      1152 * Real.sqrt n * M * (W ^ 2 * B ^ 3) := by
+    calc
+      _ ≤ S⁻¹ * (128 * W ^ 2 * (9 * M ^ 2 * B ^ 3)) :=
+        mul_le_mul_of_nonneg_left (mul_le_mul_of_nonneg_left inner (by positivity)) (by positivity)
+      _ = _ := by
+        change (M / Real.sqrt n)⁻¹ * _ = _
+        rw [inv_div]; field_simp; ring
+  have aBound : A ^ 2 ≤ T ^ 5 * B ^ 7 := by
+    unfold A
+    rw [mul_pow, ← pow_mul]
+    exact mul_le_mul (pow_le_pow_right₀ TLower (by decide : 2 * 2 ≤ 5))
+      (pow_le_pow_right₀ BLower (by decide : 2 ≤ 7)) (sq_nonneg _) (by positivity)
+  have wBound : W ^ 2 * B ^ 3 ≤ T ^ 5 * B ^ 7 := by
+    unfold W
+    rw [mul_pow, mul_assoc, ← pow_add]
+    exact mul_le_mul (pow_le_pow_right₀ TLower (by decide : 2 ≤ 5))
+      (pow_le_pow_right₀ BLower (by decide : 2 + 3 ≤ 7)) (by positivity) (by positivity)
+  have exponentLe : (n : ℝ) ^ (9 / 10 : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
+    Real.rpow_le_rpow_of_exponent_le nLower (by norm_num)
+  have sqrtBound : Real.sqrt n * M ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
+    (b1B1_sqrt_mul_stepLow_le hn).trans exponentLe
+  calc
+    _ ≤ (1 / 2 : ℝ) * (2 * Real.sqrt n * M * A ^ 2 +
+          1152 * Real.sqrt n * M * (W ^ 2 * B ^ 3)) :=
+      mul_le_mul_of_nonneg_left (add_le_add first second) (by norm_num)
+    _ = Real.sqrt n * M * (A ^ 2 + 576 * (W ^ 2 * B ^ 3)) := by ring
+    _ ≤ (n : ℝ) ^ (23 / 24 : ℝ) * (T ^ 5 * B ^ 7 + 576 * (T ^ 5 * B ^ 7)) :=
+      mul_le_mul sqrtBound
+        (add_le_add aBound (mul_le_mul_of_nonneg_left wBound (by norm_num)))
+        (by positivity) (by positivity)
+    _ = 577 * finalScale n T := by unfold finalScale; ring
+
+end GoldbachB1B1Budget
