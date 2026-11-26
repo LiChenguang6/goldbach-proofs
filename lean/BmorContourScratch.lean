@@ -3907,3 +3907,124 @@ theorem logDeriv_negative_re_upper (f : ℂ → ℂ) (Z : Finset ℂ) (z : ℂ)
   linarith only [(abs_le.mp hh).1,hs]
 
 end GoldbachProgression
+
+
+namespace GoldbachProgression
+open Finset Filter Set MeasureTheory Complex DirichletCharacter Metric MeromorphicOn
+open scoped BigOperators Classical Topology
+
+noncomputable def signedDiskConstant : ℝ :=
+  9*(1440 + 1440*Real.log 48/Real.log (47/46))
+
+/-- Explicit signed estimate at any height and any point 1 < sigma ≤ 2.
+The second conjunct isolates an actual zero at the same height.
+This is unconditional for a nonprincipal character, with deliberately
+coarse constants inherited from the disk estimates. -/
+theorem nonprincipal_signed_logDeriv_bounds {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hχ : χ ≠ 1) (s : ℂ)
+    (hs : 1 < s.re) (hs₁ : s.re ≤ 2) :
+    (-logDeriv χ.LFunction s).re ≤
+      signedDiskConstant * Real.log ((q:ℝ)*(2+|s.im|)) ∧
+    ∀ ρ : ℂ, 1/2 ≤ ρ.re → ρ.im = s.im → χ.LFunction ρ = 0 →
+      (-logDeriv χ.LFunction s).re ≤
+        signedDiskConstant * Real.log ((q:ℝ)*(2+|s.im|)) - 1/(s.re-ρ.re) := by
+  have hs₀ : 1/4 ≤ s.re := by linarith
+  let c : ℂ := ⟨3, s.im⟩
+  let F (w : ℂ) := χ.LFunction (w + c)
+  let U : ℝ := (q : ℝ) * (2 + |s.im|)
+  let B := 128 * U
+  have hq : 1 ≤ (q : ℝ) := by exact_mod_cast (show 1 ≤ q from q.pos_of_neZero)
+  have hU : 2 ≤ U := calc
+    (2 : ℝ) ≤ 2 + |s.im| := le_add_of_nonneg_right (abs_nonneg _)
+    _ ≤ U := le_mul_of_one_le_left (by positivity) hq
+  have hUpos : 0 < U := by linarith
+  have hB : 1 ≤ B := by dsimp only [B]; linarith
+  have hc : ‖c‖ ≤ 3 + |s.im| := by simpa [c] using Complex.norm_le_abs_re_add_abs_im c
+  have hboundary (w : ℂ) (hw : w ∈ sphere 0 (47/16)) : ‖F w‖ ≤ B := by
+    have hwN : ‖w‖ = 47 / 16 := by simpa only [mem_sphere, dist_zero_right] using hw
+    have hwre := (abs_le.mp ((Complex.abs_re_le_norm w).trans_eq hwN)).1
+    have hRe : 1 / 16 ≤ (w + c).re := by simp only [Complex.add_re, c]; linarith
+    have hRepos : 0 < (w + c).re := by linarith
+    have hnorm : ‖w + c‖ ≤ 4 * (2 + |s.im|) := by
+      linarith [norm_add_le w c, abs_nonneg s.im]
+    calc
+      _ ≤ ‖w+c‖ * ((q : ℝ) + 1) / (w+c).re :=
+        nonprincipal_LFunction_norm_le χ hχ (w+c) hRepos
+      _ ≤ 32 * (q:ℝ) * ‖w+c‖ := by
+        apply (div_le_iff₀ hRepos).mpr
+        have h₁ := mul_le_mul_of_nonneg_right hRe (show 0 ≤ 32 * (q : ℝ) * ‖w+c‖ by positivity)
+        have h₂ := mul_le_mul_of_nonneg_left hq (norm_nonneg (w+c))
+        linarith only [h₁, h₂]
+      _ ≤ 32 * (q:ℝ) * (4 * (2+|s.im|)) := by gcongr
+      _ = B := by dsimp only [B, U]; ring
+  have hlower : 1/2 ≤ ‖F 0‖ := by
+    simpa only [F, zero_add] using (half_le_norm_LFunction_of_re_eq_three χ (s := c) rfl)
+  have hFpos : 0 < ‖F 0‖ := by linarith
+  have hratio : B / ‖F 0‖ ≤ 256 * U := by
+    apply (div_le_iff₀ hFpos).mpr
+    calc B = 256 * U * (1/2) := by dsimp only [B]; ring
+         _ ≤ _ := mul_le_mul_of_nonneg_left hlower (by positivity)
+  have hlog : Real.log (B / ‖F 0‖) ≤ 9 * Real.log U := by
+    calc
+      _ ≤ Real.log (256 * U) := Real.log_le_log (div_pos (by linarith) hFpos) hratio
+      _ = 8 * Real.log 2 + Real.log U := by
+        rw [show (256 : ℝ) = 2 ^ 8 by norm_num, Real.log_mul (by norm_num) hUpos.ne', Real.log_pow]
+        norm_num
+      _ ≤ _ := by linarith [Real.log_le_log (by norm_num : (0 : ℝ) < 2) hU]
+  have hFa : AnalyticOnNhd ℂ F (closedBall 0 (47/16)) := fun w _ =>
+    ((χ.differentiable_LFunction hχ).comp (differentiable_id.add_const c)).analyticAt w
+  have hz : ‖s-c‖ ≤ 11 / 4 := by
+    have heq : s-c = ((s.re - 3 : ℝ) : ℂ) := by apply Complex.ext <;> simp [c]
+    rw [heq, Complex.norm_real, Real.norm_eq_abs, abs_le]
+    constructor <;> linarith
+
+  have hD : 0 < 9 * Real.log U := mul_pos (by norm_num) (Real.log_pos (by linarith))
+  obtain ⟨Z,hZ,hm,hPF⟩ := local_logDeriv_partial_fraction F hFa
+    (norm_pos_iff.mp hFpos) hB hD hboundary hlog
+  have hsn : F (s-c) ≠ 0 := by
+    simpa only [F,sub_add_cancel] using
+      (χ.LFunction_ne_zero_of_one_le_re (.inl hχ) hs.le)
+  have hpf := hPF (s-c) hz hsn
+  have htrans : logDeriv F (s-c) = logDeriv χ.LFunction s := by
+    simp only [F,logDeriv_apply,deriv_comp_add_const,sub_add_cancel]
+  have hleft (w : ℂ) (hw : w ∈ Z) : w.re ≤ (s-c).re := by
+    have hzero : χ.LFunction (w+c) = 0 := ((hZ w).mp hw).2
+    have hlt : (w+c).re < 1 := by
+      by_contra! h
+      exact (χ.LFunction_ne_zero_of_one_le_re (.inl hχ) h) hzero
+    simp only [Complex.add_re,c] at hlt
+    simp only [Complex.sub_re,c]
+    linarith
+  have hbase := logDeriv_negative_re_upper F Z (s-c) _ hleft hpf
+  rw [htrans] at hbase
+  constructor
+  · unfold signedDiskConstant
+    dsimp only [U] at hbase
+    convert hbase using 1 <;> ring
+  · intro ρ hρ him hzero
+    have hlt : ρ.re < 1 := by
+      by_contra! h
+      exact (χ.LFunction_ne_zero_of_one_le_re (.inl hχ) h) hzero
+    have hmem : ρ-c ∈ Z := by
+      apply (hZ _).mpr
+      constructor
+      · rw [mem_closedBall_zero_iff]
+        have heq : ρ-c = ((ρ.re-3:ℝ):ℂ) := by
+          apply Complex.ext <;> simp [c,him]
+        rw [heq,Complex.norm_real,Real.norm_eq_abs,abs_le]
+        constructor <;> linarith
+      · simpa only [F,sub_add_cancel] using hzero
+    have hlo := selected_pole_logDeriv_lower F Z (s-c) (ρ-c) _
+      hmem (hm _ hmem) hleft (by simp only [Complex.sub_re]; linarith)
+      (by simp [Complex.sub_im,him]) hpf
+    rw [htrans] at hlo
+    have he : (s-c).re-(ρ-c).re = s.re-ρ.re := by
+      simp only [Complex.sub_re]
+      ring
+    rw [he] at hlo
+    rw [Complex.neg_re]
+    unfold signedDiskConstant
+    dsimp only [U] at hlo
+    linarith only [hlo]
+
+end GoldbachProgression
