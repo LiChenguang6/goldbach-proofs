@@ -3284,7 +3284,9 @@ theorem finite_rectangle_twist_error {q : ℕ} [NeZero q]
       (if χ = 1 then (X:ℂ) + 1/2 else 0)‖ ≤
       ∑ z ∈ Z, (analyticOrderNatAt χ.LFunction z : ℝ) *
         ((X:ℝ)+1)^z.re / ‖z‖ := by
-    rw [hrect, mul_div_cancel_left₀ _ hc, sub_sub_cancel_left, norm_neg]
+    rw [hrect, mul_div_cancel_left₀ _ hc]
+    push_cast
+    rw [sub_sub_cancel_left, norm_neg]
     exact hsum
   have hsharp := unit_perron_line_integral χ X hX
   have htail := right_line_truncation χ hx hT hu hv
