@@ -5,6 +5,7 @@ import Mathlib.NumberTheory.DirichletCharacter.Orthogonality
 import Mathlib.NumberTheory.Harmonic.Bounds
 import Mathlib.NumberTheory.LSeries.Nonvanishing
 import Mathlib.Tactic
+set_option maxHeartbeats 1000000
 
 /-!
 The high band has an expansion in short-step geometric sums.
@@ -8913,10 +8914,12 @@ theorem b1B1_smoothed_sub_primitive_aux {ι : Type*} (n : ℕ) (nLower : 2 ≤ n
             ∑ u ∈ Icc 1 (BM n), ∑ i ∈ items.filter (fun i => g i = u), ‖c i‖ :=
           (sum_fiberwise_of_maps_to mapsTo (fun i => ‖c i‖)).symm
         calc
-          _ = h
+          (∑ i ∈ items, ‖c i‖)
+              = ∑ u ∈ Icc 1 (BM n), ∑ i ∈ items.filter (fun i => g i = u), ‖c i‖ := h
           _ ≤ ∑ _ ∈ Icc 1 (BM n), W :=
             sum_le_sum fun u uMember => weightBound u uMember
-          _ = _ := by simp [card_Icc, Nat.cast_add, Nat.cast_one]
+          _ = (BM n : ℝ) * W := by
+            rw [sum_const, card_Icc, Nat.cast_add, Nat.cast_one, nsmul_eq_mul]
       exact mul_le_mul_of_nonneg_right totalWeight (mul_nonneg CNonneg TNonneg)
     _ = _ := by unfold C; ring
 
