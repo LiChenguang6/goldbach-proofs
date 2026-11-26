@@ -8440,7 +8440,82 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
           primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
       2048000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 6 *
         (n : ℝ) ^ (31 / 32 : ℝ) := by
-  sorry
+  let G := Icc 1 (2 * A)
+  let D := Icc 1 M
+  let F := n.divisors
+  let energy := blockEnergy n A U
+  let cost q := conductorCost G D F energy q
+  let tail := ∑ g ∈ G, ∑ d ∈ D, ∑ f ∈ F, tailWeight R g f d * energy g d
+  let W := T * logBudget n
+  let C := T ^ 2 * (16 + 24 * Real.log ((n : ℝ) + 1))
+  let Q i := (step i).divisors.filter (fun q => R < q)
+  have nPositive : 0 < n := by omega
+  have BNonnegative : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
+  have WNonnegative : 0 ≤ W := mul_nonneg TNonnegative BNonnegative
+  have CNonnegative : 0 ≤ C := by
+    unfold C
+    have hlog : 0 ≤ Real.log ((n : ℝ) + 1) :=
+      Real.log_nonneg (by linarith [Nat.cast_nonneg (α := ℝ) n])
+    positivity
+  have tailNonnegative : 0 ≤ tail :=
+    sum_nonneg fun g _ => sum_nonneg fun d _ => sum_nonneg fun f _ =>
+      mul_nonneg (tailWeight_nonnegative R g f d) (blockEnergy_nonnegative n A U g d)
+  have each (i : ι) (iMember : i ∈ items) (q : ℕ) (qMember : q ∈ Q i) :
+      ‖primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
+        C / (step i : ℝ) * cost q := by
+    obtain ⟨divisor, _rQ⟩ := mem_filter.mp qMember
+    have hsr := stepRange i iMember
+    have gPos : 0 < step i := (mem_Icc.mp hsr).1
+    have gLe : step i ≤ M := (mem_Icc.mp hsr).2
+    have qPositive : 0 < q := Nat.pos_of_mem_divisors divisor
+    have qBound : q ≤ M :=
+      (Nat.le_of_dvd gPos (Nat.dvd_of_mem_divisors divisor)).trans gLe
+    exact norm_primitiveBlock_le n M B H q (step i) lo hi U A nPositive APositive
+      qPositive qBound mN radiusUpper indices indexRange w TNonnegative wBound divisorBound
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ i ∈ items, weight i * ∑ q ∈ Q i, C / (step i : ℝ) * cost q := by
+      refine sum_le_sum fun i iMember => ?_
+      have hwi : ‖(weight i : ℂ)‖ = weight i := by
+        rw [Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg (weightNonneg i iMember)]
+      rw [norm_mul, hwi]
+      exact mul_le_mul_of_nonneg_left
+        ((norm_sum_le _ _).trans (sum_le_sum (each i iMember)))
+        (weightNonneg i iMember)
+    _ = C * ∑ i ∈ items, (weight i / (step i : ℝ)) * ∑ q ∈ Q i, cost q := by
+      conv_rhs => rw [mul_sum]
+      refine sum_congr rfl fun _ _ => ?_
+      rw [← mul_sum]
+      ring
+    _ ≤ C * ((W * (1 + Real.log M)) * tail) := by
+      have mainBound := sum_weighted_moduli_le items step weight R M MPositive WNonnegative
+        stepRange weightBound G D F energy
+        (fun g hg => by have := (mem_Icc.mp hg).1; omega)
+        (fun d hd => by have := (mem_Icc.mp hd).1; omega)
+        (fun f hf => Nat.pos_of_mem_divisors hf)
+        energyNonneg
+      exact mul_le_mul_of_nonneg_left mainBound CNonnegative
+    _ ≤ (40 * T ^ 2 * logBudget n) * ((W * logBudget n) *
+        (51200 * gcdSeriesConstant * T ^ 2 * logBudget n ^ 3 *
+          (n : ℝ) ^ (31 / 32 : ℝ))) := by
+      have logPlus : Real.log ((n : ℝ) + 1) ≤ logBudget n := by
+        have h1 : Real.log ((n : ℝ) + 1) ≤ Real.log ((n : ℝ) + 2) :=
+          Real.log_le_log (by linarith) (by linarith)
+        simp only [logBudget]; linarith
+      have CBound : C ≤ 40 * T ^ 2 * logBudget n := by
+        unfold C
+        calc
+          _ ≤ T ^ 2 * (40 * logBudget n) := by
+            apply mul_le_mul_of_nonneg_left _ (sq_nonneg _)
+            linarith only [logPlus, one_le_logBudget n]
+          _ = _ := by ring
+      have mLogNonnegative : 0 ≤ 1 + Real.log M :=
+        add_nonneg zero_le_one (Real.log_nonneg (by exact_mod_cast MPositive))
+      apply mul_le_mul CBound _
+        (mul_nonneg (mul_nonneg WNonnegative mLogNonnegative) tailNonnegative) (by positivity)
+      exact mul_le_mul (mul_le_mul_of_nonneg_left stepLog WNonnegative)
+        tailBound tailNonnegative (mul_nonneg WNonnegative BNonnegative)
+    _ = _ := by unfold W; ring
 
 -- ===========================================================================
 -- Abstract near-pair bound over the dyadic partition (ref L7699)
