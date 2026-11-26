@@ -589,13 +589,78 @@ theorem nonunit_mangoldt_bound (q n : ℕ) (hq : 1 ≤ q) (hn : 1 ≤ n) :
       Real.log_le_log (by exact_mod_cast hM) (by exact_mod_cast hbound)
     _ = _ := by rw [Nat.cast_pow, Real.log_pow]
 
-/-- A small, kernel-checked finite computation, with no native_decide. -/
-set_option maxRecDepth 10000 in
-set_option maxHeartbeats 2000000 in
+/-- Four distinct prime factors already force a modulus of at least 210.
+    This avoids opaque factorization evaluation and native_decide. -/
 theorem small_modulus_primeFactor_card (q : ℕ) (hq : q ≤ 105) :
     q.primeFactors.card ≤ 3 := by
-  have h : ∀ k : Fin 106, k.val.primeFactors.card ≤ 3 := by decide
-  exact h ⟨q, by omega⟩
+  classical
+  by_cases hz : q = 0
+  · simp [hz]
+  by_contra! hc
+  let s := q.primeFactors
+  change 3 < s.card at hc
+  have hs : 0 < s.card := by omega
+  let p₁ := s.min' (Finset.card_pos.mp hs)
+  have hp₁ : p₁ ∈ s := Finset.min'_mem _ _
+  let s₁ := s.erase p₁
+  have hc₁ : s₁.card = s.card - 1 := Finset.card_erase_of_mem hp₁
+  have hs₁ : 0 < s₁.card := by omega
+  let p₂ := s₁.min' (Finset.card_pos.mp hs₁)
+  have hp₂ : p₂ ∈ s₁ := Finset.min'_mem _ _
+  let s₂ := s₁.erase p₂
+  have hc₂ : s₂.card = s₁.card - 1 := Finset.card_erase_of_mem hp₂
+  have hs₂ : 0 < s₂.card := by omega
+  let p₃ := s₂.min' (Finset.card_pos.mp hs₂)
+  have hp₃ : p₃ ∈ s₂ := Finset.min'_mem _ _
+  let s₃ := s₂.erase p₃
+  have hc₃ : s₃.card = s₂.card - 1 := Finset.card_erase_of_mem hp₃
+  have hs₃ : 0 < s₃.card := by omega
+  let p₄ := s₃.min' (Finset.card_pos.mp hs₃)
+  have hp₄ : p₄ ∈ s₃ := Finset.min'_mem _ _
+  let s₄ := s₃.erase p₄
+  have hsub₁ : s₁ ⊆ s := Finset.erase_subset _ _
+  have hsub₂ : s₂ ⊆ s₁ := Finset.erase_subset _ _
+  have hsub₃ : s₃ ⊆ s₂ := Finset.erase_subset _ _
+  have hsub₄ : s₄ ⊆ s₃ := Finset.erase_subset _ _
+  have hprime (p : ℕ) (hp : p ∈ s) : p.Prime := Nat.prime_of_mem_primeFactors hp
+  have h12 : p₁ < p₂ :=
+    lt_of_le_of_ne (Finset.min'_le s p₂ (hsub₁ hp₂)) (Finset.mem_erase.mp hp₂).1.symm
+  have h23 : p₂ < p₃ :=
+    lt_of_le_of_ne (Finset.min'_le s₁ p₃ (hsub₂ hp₃)) (Finset.mem_erase.mp hp₃).1.symm
+  have h34 : p₃ < p₄ :=
+    lt_of_le_of_ne (Finset.min'_le s₂ p₄ (hsub₃ hp₄)) (Finset.mem_erase.mp hp₄).1.symm
+  have h1 : 2 ≤ p₁ := (hprime p₁ hp₁).two_le
+  have h2 : 3 ≤ p₂ := by omega
+  have h3 : 5 ≤ p₃ := by
+    by_contra! h
+    have heq : p₃ = 4 := by omega
+    have hp := hprime p₃ (hsub₁ (hsub₂ hp₃))
+    rw [heq] at hp
+    exact (by decide : ¬ Nat.Prime 4) hp
+  have h4 : 7 ≤ p₄ := by
+    by_contra! h
+    have heq : p₄ = 6 := by omega
+    have hp := hprime p₄ (hsub₁ (hsub₂ (hsub₃ hp₄)))
+    rw [heq] at hp
+    exact (by decide : ¬ Nat.Prime 6) hp
+  have hrest : 1 ≤ ∏ p ∈ s₄, p := by
+    exact Finset.prod_pos (fun p hp =>
+      (hprime p (hsub₁ (hsub₂ (hsub₃ (hsub₄ hp))))).pos)
+  have e₁ : p₁ * (∏ p ∈ s₁, p) = ∏ p ∈ s, p :=
+    Finset.mul_prod_erase s id hp₁
+  have e₂ : p₂ * (∏ p ∈ s₂, p) = ∏ p ∈ s₁, p :=
+    Finset.mul_prod_erase s₁ id hp₂
+  have e₃ : p₃ * (∏ p ∈ s₃, p) = ∏ p ∈ s₂, p :=
+    Finset.mul_prod_erase s₂ id hp₃
+  have e₄ : p₄ * (∏ p ∈ s₄, p) = ∏ p ∈ s₃, p :=
+    Finset.mul_prod_erase s₃ id hp₄
+  have hmul : 210 ≤ p₁*(p₂*(p₃*(p₄*(∏ p ∈ s₄, p)))) := by
+    calc
+      210 = 2*(3*(5*(7*1))) := by norm_num
+      _ ≤ _ := Nat.mul_le_mul h1 (Nat.mul_le_mul h2 (Nat.mul_le_mul h3 (Nat.mul_le_mul h4 hrest)))
+  rw [e₄, e₃, e₂, e₁] at hmul
+  have hprod : (∏ p ∈ s, p) ≤ q := Nat.le_of_dvd (Nat.pos_of_ne_zero hz) (Nat.prod_primeFactors_dvd q)
+  omega
 
 /-- For the frozen threshold, the correction 3 log x takes at most 1%
     of x/(840 log x). The proof uses only elementary real inequalities. -/
@@ -684,7 +749,7 @@ theorem bmor_of_primitive_budget
           (if χ = 1 then (n:ℂ) else 0)‖) + (q.totient:ℝ)*D := by
       simp only [Finset.sum_add_distrib, Finset.sum_const, Finset.card_univ, hcard, nsmul_eq_mul]
     _ ≤ (q.totient:ℝ)*(99/100*B) + (q.totient:ℝ)*D :=
-      add_le_add_right hH _
+      add_le_add hH le_rfl
     _ = _ := by rw [hD']; ring
 
 
@@ -733,7 +798,9 @@ theorem logPowerTailPrimitive_nonpos (d m t : ℝ) (hd : 1≤d) (hm : 0<m)
   have hprod : 1≤d*t := by nlinarith [mul_nonneg (sub_nonneg.mpr hd) (sub_nonneg.mpr ht)]
   have hlog := Real.log_nonneg hprod
   unfold logPowerTailPrimitive
-  exact mul_nonpos_of_nonpos_of_nonneg (by positivity) (Real.exp_pos _).le
+  exact mul_nonpos_of_nonpos_of_nonneg
+    (neg_nonpos.mpr (add_nonneg (div_nonneg hlog hm.le) (div_nonneg zero_le_one (sq_nonneg m))))
+    (Real.exp_pos _).le
 
 theorem logPowerTailIntegral_bound (d m a b : ℝ) (hd : 1≤d) (hm : 0<m)
     (ha : 1≤a) (hab : a≤b) :
