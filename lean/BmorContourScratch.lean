@@ -3796,3 +3796,114 @@ theorem rightHalf_exists_certified_rectangle {q : ℕ} [NeZero q]
   exact ⟨hleft,by linarith,hbot,htop⟩
 
 end GoldbachProgression
+
+
+namespace GoldbachProgression
+open Finset Filter Set MeasureTheory Complex DirichletCharacter Metric MeromorphicOn
+open scoped BigOperators Classical Topology
+
+/-- Keep the partial fractions instead of replacing them by absolute
+values. In the right half-plane the real part of each zero contribution
+has a useful sign. The disk estimate is from the credited PR #46. -/
+theorem local_logDeriv_partial_fraction (f : ℂ → ℂ)
+    (hf : AnalyticOnNhd ℂ f (closedBall 0 (47/16))) (hf₀ : f 0 ≠ 0)
+    {B D : ℝ} (hB : 1 ≤ B) (hD : 0 < D)
+    (hboundary : ∀ w ∈ sphere 0 (47/16), ‖f w‖ ≤ B)
+    (hlog : Real.log (B / ‖f 0‖) ≤ D) :
+    ∃ Z : Finset ℂ,
+      (∀ ρ : ℂ, ρ ∈ Z ↔ ρ ∈ closedBall (0:ℂ) (23/8) ∧ f ρ = 0) ∧
+      (∀ ρ ∈ Z, 0 < analyticOrderNatAt f ρ) ∧
+      ∀ z : ℂ, ‖z‖ ≤ 11/4 → f z ≠ 0 →
+        ‖logDeriv f z - ∑ ρ ∈ Z, (analyticOrderNatAt f ρ : ℂ)/(z-ρ)‖ ≤
+          (1440 + (1440*Real.log 48)/Real.log (47/46))*D := by
+  classical
+  obtain ⟨Z,g,hZ,hg,hgn,hfac⟩ :=
+    remove_disk_zeros f 0 (23/8) (47/16) (by norm_num) (by norm_num) hf hf₀
+  let N := ∑ ρ ∈ Z, analyticOrderNatAt f ρ
+  have hr (ρ : ℂ) (hρ : ρ ∈ Z) : ‖ρ‖ ≤ 23/8 :=
+    mem_closedBall_zero_iff.mp ((hZ ρ).mp hρ).1
+  have hfrel (w : ℂ) (hw : w ∈ sphere 0 (47/16)) :
+      ‖f w‖ ≤ ‖f 0‖ * Real.exp D := by
+    apply (hboundary w hw).trans
+    have hn := norm_pos_iff.mpr hf₀
+    have h := (Real.log_le_iff_le_exp (div_pos (by linarith) hn)).mp hlog
+    simpa only [mul_comm] using (div_le_iff₀ hn).mp h
+  have hN : (N:ℝ) ≤ D / Real.log (47/46) :=
+    (inner_disk_multiplicity_bound Z hr hf hf₀ hB hboundary).trans
+      (div_le_div_of_nonneg_right hlog (Real.log_nonneg (by norm_num)))
+  refine ⟨Z,hZ,?_,?_⟩
+  · intro ρ hρ
+    have hp := (hZ ρ).mp hρ
+    have hbig : ρ ∈ closedBall (0:ℂ) (47/16) :=
+      closedBall_subset_closedBall (by norm_num) hp.1
+    have hntop : analyticOrderAt f ρ ≠ ⊤ :=
+      hf.analyticOrderAt_ne_top_of_isPreconnected
+        (isConnected_closedBall (by norm_num : (0:ℝ) ≤ 47/16)).isPreconnected
+        (mem_closedBall_self (by norm_num)) hbig
+        (by simp [(hf 0 (mem_closedBall_self (by norm_num))).analyticOrderAt_eq_zero.mpr hf₀])
+    apply Nat.pos_of_ne_zero
+    intro horder
+    apply (hf ρ hbig).analyticOrderAt_ne_zero.mpr hp.2
+    rw [← Nat.cast_analyticOrderNatAt hntop,horder,Nat.cast_zero]
+  · intro z hz hne
+    have hzZ : z ∉ Z := fun hzZ => hne ((hZ z).mp hzZ).2
+    have h := logDeriv_bound_after_removing_zeros f g Z (analyticOrderNatAt f)
+      hr (fun w _ => hfac w)
+      (hg.differentiableOn.diffContOnCl_ball Set.Subset.rfl)
+      (fun w hw => hgn w (ball_subset_closedBall hw)) hD hfrel hz hzZ
+    have hlog48 : 0 ≤ Real.log 48 := Real.log_nonneg (by norm_num)
+    calc
+      _ ≤ 1440*(D+(N:ℝ)*Real.log 48) := h
+      _ ≤ 1440*(D+(D/Real.log (47/46))*Real.log 48) := by gcongr
+      _ = _ := by ring
+
+/-- Sign of a complex pole term when the evaluation point is to its right.
+The real-pole case of this calculation also occurs in upstream PR #2493. -/
+theorem pole_contribution_re_nonneg (m : ℕ) (z ρ : ℂ) (h : ρ.re ≤ z.re) :
+    0 ≤ ((m:ℂ)/(z-ρ)).re := by
+  rw [Complex.div_re]
+  simp only [Complex.natCast_re,Complex.natCast_im,Complex.sub_re,zero_mul,zero_div,add_zero]
+  exact div_nonneg (mul_nonneg (Nat.cast_nonneg _) (sub_nonneg.mpr h)) (Complex.normSq_nonneg _)
+
+/-- A zero whose imaginary part matches the evaluation height contributes
+at least 1/(sigma-beta) to the real part of the logarithmic derivative.
+All other roots in the disk contribute nonnegatively. -/
+theorem selected_pole_logDeriv_lower (f : ℂ → ℂ) (Z : Finset ℂ) (z ρ : ℂ)
+    (E : ℝ) (hρ : ρ ∈ Z) (hm : 0 < analyticOrderNatAt f ρ)
+    (hleft : ∀ w ∈ Z, w.re ≤ z.re) (hgap : ρ.re < z.re) (him : z.im = ρ.im)
+    (herr : ‖logDeriv f z -
+      ∑ w ∈ Z, (analyticOrderNatAt f w : ℂ)/(z-w)‖ ≤ E) :
+    1/(z.re-ρ.re)-E ≤ (logDeriv f z).re := by
+  classical
+  let v (w : ℂ) := (analyticOrderNatAt f w : ℂ)/(z-w)
+  have hsum := Finset.single_le_sum (f := fun w => (v w).re)
+    (fun w hw => pole_contribution_re_nonneg _ _ _ (hleft w hw)) hρ
+  have he : z-ρ = ((z.re-ρ.re:ℝ):ℂ) := by
+    apply Complex.ext
+    · simp
+    · simp [him]
+  have hv : (v ρ).re = (analyticOrderNatAt f ρ : ℝ)/(z.re-ρ.re) := by
+    dsimp [v]
+    rw [he, ← Complex.ofReal_natCast, ← Complex.ofReal_div, Complex.ofReal_re]
+  rw [hv] at hsum
+  have hm' : (1:ℝ) ≤ analyticOrderNatAt f ρ := by exact_mod_cast hm
+  have hsingle := div_le_div_of_nonneg_right hm' (sub_nonneg.mpr hgap.le)
+  have habs := (Complex.abs_re_le_norm (logDeriv f z - ∑ w ∈ Z,v w)).trans herr
+  rw [Complex.sub_re, Complex.re_sum] at habs
+  linarith only [(abs_le.mp habs).1,hsum,hsingle]
+
+/-- If all poles lie to the left, their contribution may also simply
+be discarded in an upper bound for the negative log derivative. -/
+theorem logDeriv_negative_re_upper (f : ℂ → ℂ) (Z : Finset ℂ) (z : ℂ)
+    (E : ℝ) (hleft : ∀ w ∈ Z, w.re ≤ z.re)
+    (herr : ‖logDeriv f z - ∑ w ∈ Z, (analyticOrderNatAt f w : ℂ)/(z-w)‖ ≤ E) :
+    (-logDeriv f z).re ≤ E := by
+  have hs : 0 ≤ ∑ w ∈ Z, ((analyticOrderNatAt f w : ℂ)/(z-w)).re :=
+    Finset.sum_nonneg (fun w hw => pole_contribution_re_nonneg _ _ _ (hleft w hw))
+  have hh := (Complex.abs_re_le_norm (logDeriv f z -
+    ∑ w ∈ Z, (analyticOrderNatAt f w : ℂ)/(z-w))).trans herr
+  rw [Complex.sub_re,Complex.re_sum] at hh
+  rw [Complex.neg_re]
+  linarith only [(abs_le.mp hh).1,hs]
+
+end GoldbachProgression
