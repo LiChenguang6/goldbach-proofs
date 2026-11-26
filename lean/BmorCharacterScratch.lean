@@ -759,8 +759,8 @@ theorem bmor_of_primitive_budget
 noncomputable def logPowerTailPrimitive (d m t : ℝ) : ℝ :=
   -(Real.log (d*t)/m + 1/m^2) * Real.exp (-m*Real.log t)
 
-theorem logPowerTailPrimitive_hasDerivAt (d m t : ℝ) (hd : 0<d)
-    (hm : 0<m) (ht : 0<t) :
+theorem logPowerTailPrimitive_hasDerivAt (d m t : ℝ) (hd : 0 < d)
+    (hm : 0 < m) (ht : 0 < t) :
     HasDerivAt (logPowerTailPrimitive d m)
       (Real.log (d*t)*Real.exp (-m*Real.log t)/t) t := by
   have hdt : HasDerivAt (fun z : ℝ => d*z) d t := by
@@ -772,12 +772,12 @@ theorem logPowerTailPrimitive_hasDerivAt (d m t : ℝ) (hd : 0<d)
   convert h using 1
   · funext z
     rfl
-  · simp only [id_eq]
+  · try simp only [id_eq]
     field_simp [hd.ne', hm.ne', ht.ne']
     <;> ring
 
-theorem logPowerTailIntegral (d m a b : ℝ) (hd : 0<d) (hm : 0<m)
-    (ha : 0<a) (hab : a≤b) :
+theorem logPowerTailIntegral (d m a b : ℝ) (hd : 0 < d) (hm : 0 < m)
+    (ha : 0 < a) (hab : a ≤ b) :
     (∫ t in a..b, Real.log (d*t)*Real.exp (-m*Real.log t)/t) =
       logPowerTailPrimitive d m b - logPowerTailPrimitive d m a := by
   have hc : ContinuousOn
@@ -785,7 +785,7 @@ theorem logPowerTailIntegral (d m a b : ℝ) (hd : 0<d) (hm : 0<m)
       (Set.uIcc a b) := by
     intro t ht
     rw [Set.uIcc_of_le hab] at ht
-    have hp : 0<t := ha.trans_le ht.1
+    have hp : 0 < t := ha.trans_le ht.1
     apply ContinuousAt.continuousWithinAt
     fun_prop (disch := positivity)
   apply intervalIntegral.integral_eq_sub_of_hasDerivAt _ hc.intervalIntegrable
@@ -793,17 +793,17 @@ theorem logPowerTailIntegral (d m a b : ℝ) (hd : 0<d) (hm : 0<m)
   rw [Set.uIcc_of_le hab] at ht
   exact logPowerTailPrimitive_hasDerivAt d m t hd hm (ha.trans_le ht.1)
 
-theorem logPowerTailPrimitive_nonpos (d m t : ℝ) (hd : 1≤d) (hm : 0<m)
-    (ht : 1≤t) : logPowerTailPrimitive d m t ≤ 0 := by
-  have hprod : 1≤d*t := by nlinarith [mul_nonneg (sub_nonneg.mpr hd) (sub_nonneg.mpr ht)]
+theorem logPowerTailPrimitive_nonpos (d m t : ℝ) (hd : 1 ≤ d) (hm : 0 < m)
+    (ht : 1 ≤ t) : logPowerTailPrimitive d m t ≤ 0 := by
+  have hprod : 1 ≤ d*t := by nlinarith [mul_nonneg (sub_nonneg.mpr hd) (sub_nonneg.mpr ht)]
   have hlog := Real.log_nonneg hprod
   unfold logPowerTailPrimitive
   exact mul_nonpos_of_nonpos_of_nonneg
     (neg_nonpos.mpr (add_nonneg (div_nonneg hlog hm.le) (div_nonneg zero_le_one (sq_nonneg m))))
     (Real.exp_pos _).le
 
-theorem logPowerTailIntegral_bound (d m a b : ℝ) (hd : 1≤d) (hm : 0<m)
-    (ha : 1≤a) (hab : a≤b) :
+theorem logPowerTailIntegral_bound (d m a b : ℝ) (hd : 1 ≤ d) (hm : 0 < m)
+    (ha : 1 ≤ a) (hab : a ≤ b) :
     (∫ t in a..b, Real.log (d*t)*Real.exp (-m*Real.log t)/t) ≤
       (Real.log (d*a)/m+1/m^2)*Real.exp (-m*Real.log a) := by
   rw [logPowerTailIntegral d m a b (by linarith) hm (by linarith) hab]
@@ -812,7 +812,7 @@ theorem logPowerTailIntegral_bound (d m a b : ℝ) (hd : 1≤d) (hm : 0<m)
   unfold logPowerTailPrimitive at h
   linarith only [h]
 
-theorem logPowerIntegrand_eq (d m t : ℝ) (ht : 0<t) :
+theorem logPowerIntegrand_eq (d m t : ℝ) (ht : 0 < t) :
     Real.log (d*t)*Real.exp (-m*Real.log t)/t =
       Real.log (d*t)/t^(m+1) := by
   rw [Real.rpow_def_of_pos ht,
@@ -836,21 +836,21 @@ theorem psiAP_mono (q a : ℕ) : Monotone (psiAP q a) := by
   · intro k hk hnot
     exact ArithmeticFunction.vonMangoldt_nonneg
 
-theorem bmor_cell_certificate (q a A B n : ℕ) (hq : 1≤q) (hA : 2≤A)
-    (hAn : A≤n) (hnB : n≤B)
+theorem bmor_cell_certificate (q a A B n : ℕ) (hq : 1 ≤ q) (hA : 2 ≤ A)
+    (hAn : A ≤ n) (hnB : n ≤ B)
     (hlo : (B:ℝ)/(q.totient:ℝ) - psiAP q a A ≤
       (A:ℝ)/(840*Real.log (B:ℝ)))
     (hhi : psiAP q a B - (A:ℝ)/(q.totient:ℝ) ≤
       (A:ℝ)/(840*Real.log (B:ℝ))) :
     |psiAP q a n - (n:ℝ)/(q.totient:ℝ)| ≤
       (n:ℝ)/(840*Real.log (n:ℝ)) := by
-  have hA' : (2:ℝ)≤(A:ℝ) := by exact_mod_cast hA
-  have hAn' : (A:ℝ)≤(n:ℝ) := by exact_mod_cast hAn
-  have hnB' : (n:ℝ)≤(B:ℝ) := by exact_mod_cast hnB
-  have hln : 0<Real.log (n:ℝ) := Real.log_pos (by linarith)
-  have hlB : Real.log (n:ℝ)≤Real.log (B:ℝ) :=
+  have hA' : (2:ℝ) ≤ (A:ℝ) := by exact_mod_cast hA
+  have hAn' : (A:ℝ) ≤ (n:ℝ) := by exact_mod_cast hAn
+  have hnB' : (n:ℝ) ≤ (B:ℝ) := by exact_mod_cast hnB
+  have hln : 0 < Real.log (n:ℝ) := Real.log_pos (by linarith)
+  have hlB : Real.log (n:ℝ) ≤ Real.log (B:ℝ) :=
     Real.log_le_log (by linarith) hnB'
-  have hp := Nat.totient_pos.mpr (by omega : 0<q)
+  have hp := Nat.totient_pos.mpr (by omega : 0 < q)
   have hp' : (0:ℝ) < q.totient := by exact_mod_cast hp
   have hl := psiAP_mono q a hAn
   have hh := psiAP_mono q a hnB
@@ -866,16 +866,16 @@ theorem bmor_cell_certificate (q a A B n : ℕ) (hq : 1≤q) (hA : 2≤A)
   constructor <;> linarith only [hl, hh, hmainl, hmainh, hlo, hhi, hb]
 
 /-- Use kernel-checked cells to certify every integer in a finite interval. -/
-theorem bmor_finite_cover (q a L U : ℕ) (hq : 1≤q) (hL : 2≤L)
+theorem bmor_finite_cover (q a L U : ℕ) (hq : 1 ≤ q) (hL : 2 ≤ L)
     (cells : Finset (ℕ×ℕ))
-    (hcover : ∀ n : ℕ, L≤n → n≤U →
-      ∃ p ∈ cells, p.1≤n ∧ n≤p.2)
-    (hcert : ∀ p ∈ cells, 2≤p.1 ∧
+    (hcover : ∀ n : ℕ, L ≤ n → n ≤ U →
+      ∃ p ∈ cells, p.1 ≤ n ∧ n ≤ p.2)
+    (hcert : ∀ p ∈ cells, 2 ≤ p.1 ∧
       (p.2:ℝ)/(q.totient:ℝ)-psiAP q a p.1 ≤
         (p.1:ℝ)/(840*Real.log (p.2:ℝ)) ∧
       psiAP q a p.2-(p.1:ℝ)/(q.totient:ℝ) ≤
         (p.1:ℝ)/(840*Real.log (p.2:ℝ))) :
-    ∀ n : ℕ, L≤n → n≤U →
+    ∀ n : ℕ, L ≤ n → n ≤ U →
       |psiAP q a n - (n:ℝ)/(q.totient:ℝ)| ≤
         (n:ℝ)/(840*Real.log (n:ℝ)) := by
   intro n hn hU
