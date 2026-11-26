@@ -915,7 +915,8 @@ theorem twistCoeff_sum_norm_le {q : ℕ} [NeZero q]
 theorem twistCoeff_sum_norm_bigO {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) :
     (fun n : ℕ => ∑ k ∈ Finset.Icc 1 n, ‖twistCoeff χ k‖) =O[atTop]
       (fun n : ℕ => (n : ℝ)^(1:ℝ)) := by
-  apply isBigO_of_le (Real.log 4 + 4)
+  apply isBigO_iff.mpr
+  refine ⟨Real.log 4 + 4, Filter.Eventually.of_forall ?_⟩
   intro n
   rw [Real.norm_of_nonneg (Finset.sum_nonneg (fun _ _ => norm_nonneg _)),
     Real.rpow_one, Real.norm_of_nonneg (by positivity : 0 ≤ (n:ℝ))]
@@ -994,7 +995,7 @@ theorem perronKernel_norm_le (x c t : ℝ) (hx : 0 < x) (ht : 0 < |t|) :
   have hden := mul_le_mul h1 h2 (abs_nonneg t) (Real.sqrt_nonneg _)
   rw [← sq, sq_abs] at hden
   exact div_le_div_of_nonneg_left (Real.rpow_nonneg hx.le _)
-    (by positivity) hden
+    (sq_pos_of_ne_zero (abs_pos.mp ht)) hden
 
 
 /- Exact smoothed Perron kernel by Mathlib's Mellin inversion.
@@ -1054,9 +1055,9 @@ theorem smoothCut_mellin_vertical_integrable (c : ℝ) (hc : 1 ≤ c) :
       linarith)).2
   unfold Complex.VerticalIntegrable
   simp_rw [hM]
-  apply integrable_inv_one_add_sq.mono' (g := fun t : ℝ =>
-     1/(((c:ℂ)+(t:ℂ)*Complex.I)*((c:ℂ)+(t:ℂ)*Complex.I+1)))
-  · fun_prop
+  apply integrable_inv_one_add_sq.mono'
+  · apply Measurable.aestronglyMeasurable
+    exact measurable_const.div (by fun_prop)
   · filter_upwards with t
     have h := perronKernel_norm 1 c t (by norm_num)
     simp only [perronKernel, Complex.ofReal_one, Complex.one_cpow, Real.one_rpow] at h
@@ -1126,7 +1127,6 @@ theorem integratedTwist_difference {q : ℕ} (χ : DirichletCharacter ℂ q)
     omega
   unfold integratedTwist
   rw [← Finset.sum_sdiff hsub, hd]
-  rw [add_sub_assoc, add_comm, ← add_sub_assoc]
   have hsum : (∑ k ∈ Finset.range (n+1),
       (((n+h:ℕ):ℂ)-(k:ℂ))*twistCoeff χ k) -
       (∑ k ∈ Finset.range (n+1), ((n:ℂ)-(k:ℂ))*twistCoeff χ k) =
@@ -1139,7 +1139,11 @@ theorem integratedTwist_difference {q : ℕ} (χ : DirichletCharacter ℂ q)
     push_cast
     unfold twistCoeff
     ring
-  rw [hsum]
+  calc
+    _ = ((∑ k ∈ Finset.range (n+1), (((n+h:ℕ):ℂ)-(k:ℂ))*twistCoeff χ k) -
+      ∑ k ∈ Finset.range (n+1), ((n:ℂ)-(k:ℂ))*twistCoeff χ k) +
+      ∑ k ∈ Finset.Ioc n (n+h), (((n+h:ℕ):ℂ)-(k:ℂ))*twistCoeff χ k := by ring
+    _ = _ := by rw [hsum]
 
 theorem integratedTwist_difference_error {q : ℕ} [NeZero q]
     (χ : DirichletCharacter ℂ q) (n h : ℕ) (hn : 1 ≤ n) :
@@ -1215,6 +1219,6 @@ theorem unsmooth_twist_bound {q : ℕ} [NeZero q]
     simpa [mul_comm] using hN
   calc
     _ ≤ _ := hQ
-    _ = _ := by field_simp [hh'.ne']; ring
+    _ = _ := by field_simp [hh'.ne'] <;> ring
 
 end BmorScratch
