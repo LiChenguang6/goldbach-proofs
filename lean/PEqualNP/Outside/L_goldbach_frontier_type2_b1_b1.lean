@@ -6447,7 +6447,7 @@ end GoldbachB1B1Tool
 namespace GoldbachB1B1OffWave
 
 open Finset MeasureTheory Filter
-open DyadicMixedB4Geometric DyadicMixedB4GcdHarmonic
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry DyadicMixedB4GcdHarmonic
 
 theorem wave_continuous (g l r : ℕ) : Continuous (wave g l r) := by
   unfold wave phase; fun_prop
@@ -6604,5 +6604,24 @@ theorem offWave_mass_le_weighted {ι : Type*} (items : Finset ι) (n M : ℕ) (b
   have constantTerm : (M : ℝ) * ((M : ℝ) * J) = (M : ℝ) ^ 2 * J := by ring
   rw [constantTerm]
   exact add_le_add_right (mul_le_mul_of_nonneg_left gcdBound (by positivity)) _
+
+open GoldbachB1B1Scale
+
+/-- b1-b1 instantiation of the weighted offWave mass bound: step `M = b1B1_stepLow n`,
+    grid radius `b = radius M`, per-step weight concentration `W`. -/
+theorem lowOffWave_mass_le {ι : Type*} (items : Finset ι) (n : ℕ) (W : ℝ)
+    (g l r : ι → ℕ) (c : ι → ℂ)
+    (MPos : 0 < b1B1_stepLow n) (MBound : b1B1_stepLow n ≤ n)
+    (bPos : 0 < radius (b1B1_stepLow n)) (WNonneg : 0 ≤ W)
+    (gRange : ∀ i ∈ items, 0 < g i ∧ g i ≤ b1B1_stepLow n)
+    (rRange : ∀ i ∈ items, r i ≤ n / g i)
+    (weightBound : ∀ u ∈ Icc 1 (b1B1_stepLow n),
+      (∑ i ∈ items.filter (fun i => g i = u), ‖c i‖) ≤ W) :
+    (∫ t in (0 : ℝ)..1,
+      ‖∑ i ∈ items, c i * offWave (radius (b1B1_stepLow n)) (g i) (l i) (r i) t‖ ^ 2) ≤
+      128 * W ^ 2 * ((b1B1_stepLow n : ℝ) ^ 2 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 +
+        (radius (b1B1_stepLow n))⁻¹ * (1 + Real.log (b1B1_stepLow n)) ^ 3) := by
+  exact offWave_mass_le_weighted items n (b1B1_stepLow n) (radius (b1B1_stepLow n)) W
+    MPos MBound bPos WNonneg g l r c gRange rRange weightBound
 
 end GoldbachB1B1OffWave
