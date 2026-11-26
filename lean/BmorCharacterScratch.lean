@@ -1090,4 +1090,131 @@ theorem smoothed_perron_inversion (c u : ℝ) (hc : 1 ≤ c) (hu : 0 < u) :
   rw [(smoothCut_hasMellin ((c:ℂ)+(t:ℂ)*Complex.I) (by
     simp [Complex.add_re, Complex.mul_re]; linarith)).2]
 
+
+/- Removing the smoothing: exact discrete derivative and quantitative
+   finite-difference error. No prime distribution estimate is assumed. -/
+noncomputable def integratedTwist {q : ℕ} (χ : DirichletCharacter ℂ q)
+    (n : ℕ) : ℂ :=
+  ∑ k ∈ Finset.range (n+1), ((n:ℂ)-(k:ℂ))*twistCoeff χ k
+
+theorem integratedTwist_succ {q : ℕ} (χ : DirichletCharacter ℂ q) (n : ℕ) :
+    integratedTwist χ (n+1) - integratedTwist χ n = psiTwist χ n := by
+  unfold integratedTwist
+  rw [show n+1+1 = (n+1)+1 by rfl, Finset.sum_range_succ]
+  simp only [sub_self, zero_mul, add_zero]
+  rw [← Finset.sum_sub_distrib]
+  unfold psiTwist
+  apply Finset.sum_congr rfl
+  intro k hk
+  push_cast
+  unfold twistCoeff
+  ring
+
+theorem integratedTwist_difference {q : ℕ} (χ : DirichletCharacter ℂ q)
+    (n h : ℕ) :
+    integratedTwist χ (n+h) - integratedTwist χ n =
+      (h:ℂ)*psiTwist χ n +
+        ∑ k ∈ Finset.Ioc n (n+h), (((n+h:ℕ):ℂ)-(k:ℂ))*twistCoeff χ k := by
+  classical
+  have hsub : Finset.range (n+1) ⊆ Finset.range (n+h+1) := by
+    intro k hk
+    have hh := Finset.mem_range.mp hk
+    exact Finset.mem_range.mpr (by omega)
+  have hd : Finset.range (n+h+1) \ Finset.range (n+1) = Finset.Ioc n (n+h) := by
+    ext k
+    simp only [Finset.mem_sdiff, Finset.mem_range, Finset.mem_Ioc]
+    omega
+  unfold integratedTwist
+  rw [← Finset.sum_sdiff hsub, hd]
+  rw [add_sub_assoc, add_comm, ← add_sub_assoc]
+  have hsum : (∑ k ∈ Finset.range (n+1),
+      (((n+h:ℕ):ℂ)-(k:ℂ))*twistCoeff χ k) -
+      (∑ k ∈ Finset.range (n+1), ((n:ℂ)-(k:ℂ))*twistCoeff χ k) =
+      (h:ℂ)*psiTwist χ n := by
+    rw [← Finset.sum_sub_distrib]
+    unfold psiTwist
+    rw [Finset.mul_sum]
+    apply Finset.sum_congr rfl
+    intro k hk
+    push_cast
+    unfold twistCoeff
+    ring
+  rw [hsum]
+
+theorem integratedTwist_difference_error {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (n h : ℕ) (hn : 1 ≤ n) :
+    ‖integratedTwist χ (n+h) - integratedTwist χ n -
+      (h:ℂ)*psiTwist χ n‖ ≤ (h:ℝ)^2*Real.log ((n+h:ℕ):ℝ) := by
+  rw [integratedTwist_difference χ n h, add_sub_cancel_left]
+  calc
+    _ ≤ ∑ k ∈ Finset.Ioc n (n+h),
+        ‖(((n+h:ℕ):ℂ)-(k:ℂ))*twistCoeff χ k‖ := norm_sum_le _ _
+    _ ≤ ∑ k ∈ Finset.Ioc n (n+h), (h:ℝ)*Real.log ((n+h:ℕ):ℝ) := by
+      apply Finset.sum_le_sum
+      intro k hk
+      obtain ⟨hkn, hkh⟩ := Finset.mem_Ioc.mp hk
+      have hk0 : (0:ℝ)<k := by exact_mod_cast (by omega : 0<k)
+      have hkn' : (n:ℝ) ≤ k := by exact_mod_cast hkn.le
+      have hkh' : (k:ℝ) ≤ ((n+h:ℕ):ℝ) := by exact_mod_cast hkh
+      have hlog : 0 ≤ Real.log ((n+h:ℕ):ℝ) := Real.log_nonneg (by
+        exact_mod_cast (by omega : 1≤n+h))
+      have hc := (twistCoeff_norm_le χ k).trans ArithmeticFunction.vonMangoldt_le_log
+      have hcl := hc.trans (Real.log_le_log hk0 hkh')
+      have hnorm : ‖((n+h:ℕ):ℂ)-(k:ℂ)‖ ≤ (h:ℝ) := by
+        rw [← Complex.ofReal_natCast (n+h), ← Complex.ofReal_natCast k,
+          ← Complex.ofReal_sub, Complex.norm_real, Real.norm_eq_abs,
+          abs_of_nonneg (sub_nonneg.mpr hkh')]
+        push_cast
+        linarith
+      rw [norm_mul]
+      exact mul_le_mul hnorm hcl (norm_nonneg _) (by positivity)
+    _ = _ := by
+      simp [Nat.card_Ioc, nsmul_eq_mul]
+      ring
+
+theorem unsmooth_twist_bound {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (n h : ℕ) (hn : 1 ≤ n) (hh : 0 < h)
+    (δ : ℂ) (B₁ B₂ : ℝ)
+    (h₁ : ‖integratedTwist χ n - δ*(n:ℂ)^2/2‖ ≤ B₁)
+    (h₂ : ‖integratedTwist χ (n+h) - δ*((n+h:ℕ):ℂ)^2/2‖ ≤ B₂) :
+    ‖psiTwist χ n - δ*(n:ℂ)‖ ≤
+      (B₁+B₂)/(h:ℝ) + (h:ℝ)*Real.log ((n+h:ℕ):ℝ) +
+        ‖δ‖*(h:ℝ)/2 := by
+  have herr := integratedTwist_difference_error χ n h hn
+  let A := integratedTwist χ n - δ*(n:ℂ)^2/2
+  let B := integratedTwist χ (n+h) - δ*((n+h:ℕ):ℂ)^2/2
+  let R := integratedTwist χ (n+h) - integratedTwist χ n - (h:ℂ)*psiTwist χ n
+  have he : (h:ℂ)*(psiTwist χ n - δ*(n:ℂ)) = (B-A)-R+δ*(h:ℂ)^2/2 := by
+    dsimp [A,B,R]
+    push_cast
+    ring
+  have hA : ‖A‖ ≤ B₁ := h₁
+  have hB : ‖B‖ ≤ B₂ := h₂
+  have hR : ‖R‖ ≤ (h:ℝ)^2*Real.log ((n+h:ℕ):ℝ) := herr
+  have hD : ‖δ*(h:ℂ)^2/2‖ = ‖δ‖*(h:ℝ)^2/2 := by
+    rw [norm_div, norm_mul, norm_pow]
+    norm_num
+  have hh' : 0 < (h:ℝ) := by exact_mod_cast hh
+  have hN : ‖(h:ℂ)*(psiTwist χ n - δ*(n:ℂ))‖ ≤
+      B₁+B₂ + (h:ℝ)^2*Real.log ((n+h:ℕ):ℝ) + ‖δ‖*(h:ℝ)^2/2 := by
+    rw [he]
+    calc
+      _ ≤ ‖(B-A)-R‖+‖δ*(h:ℂ)^2/2‖ := norm_add_le _ _
+      _ ≤ (‖B-A‖+‖R‖)+‖δ*(h:ℂ)^2/2‖ :=
+        add_le_add (norm_sub_le _ _) le_rfl
+      _ ≤ _ := by
+        have hBA := norm_sub_le B A
+        rw [hD]
+        linarith only [hA,hB,hR,hBA]
+  rw [norm_mul] at hN
+  have hnC : ‖(h:ℂ)‖ = (h:ℝ) := by simp
+  rw [hnC] at hN
+  have hQ : ‖psiTwist χ n - δ*(n:ℂ)‖ ≤
+      (B₁+B₂ + (h:ℝ)^2*Real.log ((n+h:ℕ):ℝ) + ‖δ‖*(h:ℝ)^2/2)/(h:ℝ) := by
+    apply (le_div_iff₀ hh').2
+    simpa [mul_comm] using hN
+  calc
+    _ ≤ _ := hQ
+    _ = _ := by field_simp [hh'.ne']; ring
+
 end BmorScratch
