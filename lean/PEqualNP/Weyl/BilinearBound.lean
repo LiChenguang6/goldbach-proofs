@@ -244,6 +244,50 @@ lemma inner_sum_sq_le (M N : ℕ) (b : ℕ → ℂ) (B : ℝ) (α : ℝ)
   rw [hval] at hBnd
   exact hBnd
 
+/-- **Type-II bilinear bound.**  Outer Cauchy–Schwarz composed with the
+second-moment estimate: the whole double sum gains a factor `√(NM + 2∑ …)`. -/
+lemma bilinear_bound (M N : ℕ) (a b : ℕ → ℂ) (A B : ℝ) (α : ℝ)
+    (hA : ∀ m, ‖a m‖ ≤ A) (hB : ∀ n, ‖b n‖ ≤ B) (hα0 : α ≠ 0)
+    (hα : ∀ h : ℕ, 1 ≤ h → h < N → |α * (h : ℝ)| ≤ 1 / 2) :
+    ‖∑ m ∈ Finset.range M,
+        a m * ∑ n ∈ Finset.range N, b n * E (α * ((m : ℝ) * (n : ℝ)))‖ ^ 2
+      ≤ (M : ℝ) * A ^ 2 * (B ^ 2 * ((N : ℝ) * (M : ℝ)
+          + 2 * ∑ h ∈ Finset.Icc 1 (N - 1),
+              ((N - h : ℕ) : ℝ) * min (M : ℝ) (1 / |α * (h : ℝ)|))) := by
+  have hA0 : 0 ≤ A := le_trans (norm_nonneg (a 0)) (hA 0)
+  have hcs :=
+    norm_sum_mul_sq_le M a
+      (fun m => ∑ n ∈ Finset.range N, b n * E (α * ((m : ℝ) * (n : ℝ))))
+  have h2 := inner_sum_sq_le M N b B α hB hα0 hα
+  have hAsum : (∑ m ∈ Finset.range M, ‖a m‖ ^ 2) ≤ (M : ℝ) * A ^ 2 := by
+    calc ∑ m ∈ Finset.range M, ‖a m‖ ^ 2
+        ≤ ∑ m ∈ Finset.range M, A ^ 2 := by
+          apply Finset.sum_le_sum
+          intro m _
+          exact pow_le_pow_left₀ (norm_nonneg (a m)) (hA m) 2
+      _ = (M : ℝ) * A ^ 2 := by simp [Finset.sum_const]
+  have hR : (0 : ℝ) ≤ (N : ℝ) * (M : ℝ)
+      + 2 * ∑ h ∈ Finset.Icc 1 (N - 1),
+          ((N - h : ℕ) : ℝ) * min (M : ℝ) (1 / |α * (h : ℝ)|) := by
+    have hterm : ∀ h ∈ Finset.Icc 1 (N - 1),
+        (0 : ℝ) ≤ ((N - h : ℕ) : ℝ) * min (M : ℝ) (1 / |α * (h : ℝ)|) := by
+      intro h _
+      exact mul_nonneg (Nat.cast_nonneg _) (le_min (Nat.cast_nonneg M) (by positivity))
+    have hsum := Finset.sum_nonneg hterm
+    have hNM : (0 : ℝ) ≤ (N : ℝ) * (M : ℝ) :=
+      mul_nonneg (Nat.cast_nonneg _) (Nat.cast_nonneg _)
+    linarith
+  calc ‖∑ m ∈ Finset.range M,
+        a m * ∑ n ∈ Finset.range N, b n * E (α * ((m : ℝ) * (n : ℝ)))‖ ^ 2
+      ≤ (∑ m ∈ Finset.range M, ‖a m‖ ^ 2) * ∑ m ∈ Finset.range M,
+          ‖∑ n ∈ Finset.range N, b n * E (α * ((m : ℝ) * (n : ℝ)))‖ ^ 2 := hcs
+    _ ≤ ((M : ℝ) * A ^ 2) * (B ^ 2 * ((N : ℝ) * (M : ℝ)
+          + 2 * ∑ h ∈ Finset.Icc 1 (N - 1),
+              ((N - h : ℕ) : ℝ) * min (M : ℝ) (1 / |α * (h : ℝ)|))) :=
+        mul_le_mul hAsum h2
+          (Finset.sum_nonneg (fun m _ => sq_nonneg _))
+          (mul_nonneg (Nat.cast_nonneg _) (sq_nonneg A))
+
 end
 
 end PEqualNP.Weyl
