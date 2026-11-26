@@ -8737,10 +8737,11 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
         b1B1_outsideScale n * (((n : ℝ) + 1) * A ^ 2) :=
       mul_le_mul_of_nonneg_left Fbound SPos.le
     exact e1a.trans <| mul_le_mul_of_nonneg_left hA128 SPos.le
-  have hWb : W ^ 2 * bracket ≤ W' ^ 2 * bracket :=
-    mul_le_mul_of_nonneg_right hW2 hb
-  have hW128 : (128 : ℝ) * (W ^ 2 * bracket) ≤ (128 : ℝ) * (W' ^ 2 * bracket) :=
-    mul_le_mul (by norm_num) hWb (by positivity) (by norm_num)
+  have hW128 : 128 * W ^ 2 * bracket ≤ 128 * W' ^ 2 * bracket := by
+    apply mul_le_mul_of_nonneg_right
+    · apply mul_le_mul_of_nonneg_left hW2
+      · norm_num
+    · exact hb
   have e2 : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
       (b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket) := by
     have e2a : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
