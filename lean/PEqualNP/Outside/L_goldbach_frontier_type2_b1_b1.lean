@@ -6708,3 +6708,90 @@ theorem b1B1_divisor_envelope :
     positivity
 
 end GoldbachB1B1Divisors
+
+namespace GoldbachB1B1GcdSeries
+
+open Finset
+
+noncomputable section
+
+/-- Convergent gcd-series constant `Σ_{j≥1} j^{-3/2}` (port of b1-b4 `gcdSeriesConstant`). -/
+def gcdSeriesConstant : ℝ := ∑' j : ℕ, (j : ℝ) ^ (-3 / 2 : ℝ)
+
+theorem gcdSeriesConstant_nonnegative : 0 ≤ gcdSeriesConstant :=
+  tsum_nonneg (fun j => Real.rpow_nonneg (Nat.cast_nonneg j) _)
+
+theorem inverse_sqrt_product_eq_rpow {g : ℕ} (gPositive : 0 < g) :
+    ((g : ℝ) * Real.sqrt g)⁻¹ = (g : ℝ) ^ (-3 / 2 : ℝ) := by
+  have nonnegative : (0 : ℝ) ≤ g := Nat.cast_nonneg _
+  have positive : (0 : ℝ) < g := by exact_mod_cast gPositive
+  rw [Real.sqrt_eq_rpow]
+  nth_rw 1 [← Real.rpow_one (g : ℝ)]
+  rw [← Real.rpow_add positive, ← Real.rpow_neg nonnegative]
+  norm_num
+
+theorem sum_rpow_multiples (h G : ℕ) (hPositive : 0 < h) :
+    (∑ g ∈ (Icc 1 G).filter (fun g => h ∣ g), (g : ℝ) ^ (-3 / 2 : ℝ)) =
+      (h : ℝ) ^ (-3 / 2 : ℝ) * ∑ k ∈ Icc 1 (G / h), (k : ℝ) ^ (-3 / 2 : ℝ) := by
+  rw [mul_sum]
+  symm
+  apply sum_bij (fun k _ => h * k)
+  · intro k member
+    obtain ⟨lower, upper⟩ := mem_Icc.mp member
+    have productUpper : k * h ≤ G := (Nat.le_div_iff_mul_le hPositive).mp upper
+    exact mem_filter.mpr ⟨mem_Icc.mpr ⟨Nat.mul_pos hPositive lower, by simpa [mul_comm] using productUpper⟩,
+      dvd_mul_right h k⟩
+  · intro k _ k' _ same
+    exact Nat.eq_of_mul_eq_mul_left hPositive same
+  · intro g member
+    obtain ⟨inIcc, k, identity⟩ := mem_filter.mp member
+    obtain ⟨lower, upper⟩ := mem_Icc.mp inIcc
+    have productLower : 0 < h * k := identity ▸ lower
+    have productUpper : k * h ≤ G := by simpa [identity, Nat.mul_comm] using upper
+    exact ⟨k, mem_Icc.mpr ⟨Nat.pos_of_mul_pos_left productLower,
+      (Nat.le_div_iff_mul_le hPositive).mpr productUpper⟩, identity.symm⟩
+  · intro k _
+    rw [Nat.cast_mul, Real.mul_rpow (Nat.cast_nonneg _) (Nat.cast_nonneg _)]
+
+theorem gcd_sqrt_reciprocal_sum_le (f G : ℕ) (fPositive : 0 < f) :
+    (∑ g ∈ Icc 1 G, (g.gcd f : ℝ) / ((g : ℝ) * Real.sqrt g)) ≤
+      gcdSeriesConstant * (f.divisors.card : ℝ) := by
+  let series (g : ℕ) := (g : ℝ) ^ (-3 / 2 : ℝ)
+  have sNonnegative (g : ℕ) : 0 ≤ series g := Real.rpow_nonneg (Nat.cast_nonneg _) _
+  have summable : Summable series := Real.summable_nat_rpow.mpr (by norm_num)
+  calc
+    _ ≤ ∑ g ∈ Icc 1 G, ∑ h ∈ f.divisors, if h ∣ g then (h : ℝ) * series g else 0 := by
+      refine sum_le_sum fun g member => ?_
+      have gPositive := (mem_Icc.mp member).1
+      have gcdMember : g.gcd f ∈ f.divisors :=
+        Nat.mem_divisors.mpr ⟨Nat.gcd_dvd_right g f, fPositive.ne'⟩
+      rw [div_eq_mul_inv, inverse_sqrt_product_eq_rpow gPositive]
+      have term := single_le_sum (s := f.divisors)
+        (f := fun h => if h ∣ g then (h : ℝ) * series g else 0)
+        (fun h _ => by
+          split_ifs
+          · exact mul_nonneg (Nat.cast_nonneg _) (sNonnegative g)
+          · exact le_rfl) gcdMember
+      simpa only [if_pos (Nat.gcd_dvd_left g f), series] using term
+    _ = ∑ h ∈ f.divisors, (h : ℝ) * ∑ g ∈ (Icc 1 G).filter (fun g => h ∣ g), series g := by
+      rw [sum_comm]
+      refine sum_congr rfl fun h _ => ?_
+      rw [mul_sum, sum_filter]
+    _ ≤ ∑ _ ∈ f.divisors, gcdSeriesConstant := by
+      refine sum_le_sum fun h member => ?_
+      have hPositive := Nat.pos_of_mem_divisors member
+      have hReal : (1 : ℝ) ≤ h := by exact_mod_cast hPositive
+      have coeff : (h : ℝ) * (h : ℝ) ^ (-3 / 2 : ℝ) ≤ 1 := by
+        have positive : (0 : ℝ) < h := by positivity
+        nth_rw 1 [← Real.rpow_one (h : ℝ)]
+        rw [← Real.rpow_add positive]
+        exact (Real.rpow_le_rpow_of_exponent_le hReal (by norm_num : (1 + -3 / 2 : ℝ) ≤ 0)).trans_eq
+          (Real.rpow_zero _)
+      unfold series
+      rw [sum_rpow_multiples h G hPositive, ← mul_assoc]
+      exact (mul_le_of_le_one_left (sum_nonneg fun k _ => sNonnegative k) coeff).trans
+        (summable.sum_le_tsum _ fun k _ => sNonnegative k)
+    _ = _ := by rw [sum_const, nsmul_eq_mul, mul_comm]
+
+end
+end GoldbachB1B1GcdSeries
