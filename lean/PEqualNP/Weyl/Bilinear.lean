@@ -22,6 +22,8 @@ noncomputable section
 
 open Finset
 
+set_option maxHeartbeats 4000000
+
 /-! ### A. Cauchy–Schwarz in the outer variable -/
 
 lemma norm_sum_mul_sq_le (M : ℕ) (a z : ℕ → ℂ) :
@@ -61,6 +63,19 @@ lemma inner_sum_sq (N : ℕ) (b : ℕ → ℂ) (θ : ℝ) :
   rw [mul_star_E]
   congr 1
   ring
+
+/-- Exact expansion with `α` and the outer index kept separate. -/
+lemma inner_sq_expand (N : ℕ) (b : ℕ → ℂ) (α : ℝ) (m : ℕ) :
+    ‖∑ n ∈ Finset.range N, b n * E (α * ((m : ℝ) * (n : ℝ)))‖ ^ 2
+      = ∑ n1 ∈ Finset.range N, ∑ n2 ∈ Finset.range N,
+          (b n1 * star (b n2) * E ((m : ℝ) * (α * ((n1 : ℝ) - (n2 : ℝ))))).re := by
+  rw [← Complex.normSq_eq_norm_sq]
+  rw [normSq_sum_range N (z := fun n => b n * E (α * ((m : ℝ) * (n : ℝ))))]
+  refine Finset.sum_congr rfl (fun n1 _ => Finset.sum_congr rfl (fun n2 _ => ?_))
+  rw [mul_star_E]
+  congr 1
+  congr 1
+  ring_nf
 
 end
 
