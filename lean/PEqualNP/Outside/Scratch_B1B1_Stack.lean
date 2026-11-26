@@ -6625,3 +6625,86 @@ theorem lowOffWave_mass_le {ι : Type*} (items : Finset ι) (n : ℕ) (W : ℝ)
     MPos MBound bPos WNonneg g l r c gRange rRange weightBound
 
 end GoldbachB1B1OffWave
+
+namespace GoldbachB1B1Divisors
+
+open Filter Topology
+
+/-- Divisor-count power growth: for each `K`, there is `C ≥ 1` such that
+    `(card divisors n)^K ≤ C·n` for all positive `n`. Band-position independent. -/
+theorem b1B1_divisorPower (K : ℕ) (hK : 0 < K) :
+    ∃ C : ℝ, 1 ≤ C ∧ ∀ n : ℕ, 0 < n → (n.divisors.card : ℝ) ^ K ≤ C * n := by
+  have hl := (isLittleO_pow_const_const_pow_of_one_lt (R:=ℝ) K (by norm_num : (1:ℝ)<2)).bound (by norm_num : (0:ℝ)<1)
+  obtain ⟨E,hE⟩ := eventually_atTop.mp hl
+  let c : ℝ := (2:ℝ)^K*((E:ℝ)+1)^K
+  have hc : 1≤c := by
+    dsimp [c]
+    exact one_le_mul_of_one_le_of_one_le (one_le_pow₀ (by norm_num)) (one_le_pow₀ (by linarith [Nat.cast_nonneg (α:=ℝ) E]))
+  have small (e : ℕ) : ((e:ℝ)+1)^K ≤ c*(2:ℝ)^e := by
+    by_cases he : e<E
+    · have hle : ((e:ℝ)+1)^K ≤ ((E:ℝ)+1)^K := pow_le_pow_left₀ (by positivity) (by exact_mod_cast (show e+1≤E+1 by omega)) _
+      have h2 : (1:ℝ)≤2^K := one_le_pow₀ (by norm_num)
+      have h3 : (1:ℝ)≤2^e := one_le_pow₀ (by norm_num)
+      exact hle.trans ((le_mul_of_one_le_left (by positivity) h2).trans (le_mul_of_one_le_right (by positivity) h3))
+    · have hs := hE (e+1) (by omega)
+      simp only [Function.comp_apply,Real.norm_eq_abs,Nat.cast_add,Nat.cast_one,abs_of_nonneg (pow_nonneg (by positivity : 0≤(e:ℝ)+1) K),abs_of_nonneg (pow_nonneg (by norm_num : (0:ℝ)≤2) (e+1)),one_mul,pow_succ] at hs
+      rw [abs_of_nonneg (by positivity)] at hs
+      have hK1 : (2:ℝ)≤2^K := by simpa using (pow_le_pow_right₀ (by norm_num : (1:ℝ)≤2) hK)
+      have hE1 : (1:ℝ)≤((E:ℝ)+1)^K := one_le_pow₀ (by linarith [Nat.cast_nonneg (α:=ℝ) E])
+      have hc2 : (2:ℝ)≤c := hK1.trans (le_mul_of_one_le_right (by positivity) hE1)
+      exact hs.trans (by nlinarith [mul_le_mul_of_nonneg_right hc2 (by positivity : 0≤(2:ℝ)^e)])
+  let P : ℕ := 2^K
+  refine ⟨c^P,one_le_pow₀ hc,?_⟩
+  intro n hn
+  have hprod : (∏ p ∈ n.primeFactors,(p:ℝ)^(n.factorization p))=n := by
+    exact_mod_cast (by simpa [Finsupp.prod,Nat.support_factorization] using Nat.prod_factorization_pow_eq_self hn.ne' :
+      (∏ p ∈ n.primeFactors,p^(n.factorization p))=n)
+  have hlocal (p : ℕ) (hp : p∈n.primeFactors) :
+      ((n.factorization p:ℝ)+1)^K ≤ (if p<P then c else 1)*(p:ℝ)^(n.factorization p) := by
+    have h2 : (2:ℝ)≤p := by exact_mod_cast (Nat.prime_of_mem_primeFactors hp).two_le
+    split_ifs with h
+    · exact (small _).trans (mul_le_mul_of_nonneg_left (pow_le_pow_left₀ (by norm_num) h2 _) (by linarith))
+    · rw [one_mul]
+      have he : ∀ e : ℕ,(e:ℝ)+1 ≤ (2:ℝ)^e := by
+        intro e; induction e with
+        | zero => norm_num
+        | succ e ih => push_cast; rw [pow_succ]; linarith [show (0:ℝ)≤e by positivity]
+      calc
+        _ ≤ ((2:ℝ)^n.factorization p)^K := pow_le_pow_left₀ (by positivity) (he _) _
+        _ = ((2:ℝ)^K)^n.factorization p := by rw [←pow_mul,←pow_mul,Nat.mul_comm]
+        _ ≤ _ := pow_le_pow_left₀ (by positivity) (by exact_mod_cast (show 2^K≤p by omega)) _
+  have hcount : ((n.primeFactors.filter (·<P)).card)≤P := by
+    have : n.primeFactors.filter (·<P)⊆range P := fun _ h => mem_range.mpr (mem_filter.mp h).2
+    simpa using card_le_card this
+  have hfactor : (∏ p ∈ n.primeFactors, if p<P then c else 1)≤c^P := by
+    rw [←prod_filter,prod_const]; exact pow_le_pow_right₀ hc hcount
+  rw [Nat.card_divisors hn.ne',Nat.cast_prod,←prod_pow]
+  simp only [Nat.cast_add,Nat.cast_one]
+  calc
+    _ ≤ ∏ p ∈ n.primeFactors, (if p<P then c else 1)*(p:ℝ)^(n.factorization p) :=
+      prod_le_prod₀ (fun _ _ => by positivity) hlocal
+    _ ≤ _ := by rw [prod_mul_distrib,hprod]; exact mul_le_mul_of_nonneg_right hfactor (by positivity)
+
+/-- Divisor envelope: for `m ≤ n`, `card divisors m ≤ C·n^(1/1024)`. -/
+theorem b1B1_divisor_envelope :
+    ∃ C : ℝ, 1 ≤ C ∧ ∀ n m : ℕ, m ≤ n →
+      (m.divisors.card : ℝ) ≤ C * (n : ℝ) ^ (1 / 1024 : ℝ) := by
+  obtain ⟨C, CLower, estimate⟩ := b1B1_divisorPower 1024 (by decide)
+  let p : ℝ := 1 / 1024
+  have CNonnegative : 0 ≤ C := zero_le_one.trans CLower
+  refine ⟨C ^ p, Real.one_le_rpow CLower (by norm_num [p]), fun n m upper => ?_⟩
+  by_cases mPositive : 0 < m
+  · have mReal : (m : ℝ) ≤ n := by exact_mod_cast upper
+    have standard := (estimate m mPositive).trans (mul_le_mul_of_nonneg_left mReal CNonnegative)
+    have powered := Real.rpow_le_rpow (pow_nonneg (Nat.cast_nonneg m.divisors.card) 1024) standard
+      (show 0 ≤ p by norm_num [p])
+    rw [← Real.rpow_natCast, ← Real.rpow_mul (Nat.cast_nonneg m.divisors.card),
+      Real.mul_rpow CNonnegative (Nat.cast_nonneg n)] at powered
+    norm_num [p] at powered ⊢
+    exact powered
+  · have mZero : m = 0 := by omega
+    subst m
+    simp only [Nat.divisors_zero, Finset.card_empty, Nat.cast_zero]
+    positivity
+
+end GoldbachB1B1Divisors
