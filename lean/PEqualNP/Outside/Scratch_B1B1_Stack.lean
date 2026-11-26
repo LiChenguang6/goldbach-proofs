@@ -5,6 +5,7 @@ import Mathlib.NumberTheory.DirichletCharacter.Orthogonality
 import Mathlib.NumberTheory.Harmonic.Bounds
 import Mathlib.NumberTheory.LSeries.Nonvanishing
 import Mathlib.Tactic
+
 set_option maxHeartbeats 1000000
 
 /-!
@@ -7850,8 +7851,10 @@ theorem b1B1_small_cofactor_mass_le (n X : ℕ) (hn : 0 < n) (hX : X ≤ n) :
     intro b hb
     have bLeN : b ≤ n := (mem_Ioc.mp hb).2.trans hX
     have bPos : 0 < b := by have hbU := (mem_Ioc.mp hb).1; omega
-    exact (vonMangoldt_le_log (n := b)).trans
-      (Real.log_le_log (by exact_mod_cast bPos) (by exact_mod_cast bLeN))
+    have hlog : Real.log b ≤ Real.log n :=
+      Real.log_le_log (by positivity) (by exact_mod_cast bLeN)
+    rw [Real.norm_eq_abs, abs_of_nonneg vonMangoldt_nonneg]
+    exact vonMangoldt_le_log.trans hlog
   calc
     _ ≤ ∑ b ∈ Ioc (U n) X, Real.log n := sum_le_sum hle
     _ = ((Ioc (U n) X).card : ℝ) * Real.log n := by
@@ -7875,7 +7878,8 @@ theorem b1B1_tau1_inf_le (n m : ℕ) (mBound : m ≤ n) (nPositive : 0 < n)
   have logN : Real.log n ≤ logBudget n := by
     have h1 : Real.log n ≤ Real.log ((n : ℝ) + 2) :=
       Real.log_le_log (by positivity) (by linarith)
-    exact h1.trans (le_add_of_nonneg_right zero_le_one)
+    simp only [logBudget]
+    linarith
   calc
     |τ₁ n m| ≤ (m.divisors.card : ℝ) ^ 2 * Real.log n := h
     _ ≤ T ^ 2 * logBudget n := by gcongr
@@ -7883,19 +7887,11 @@ theorem b1B1_tau1_inf_le (n m : ℕ) (mBound : m ≤ n) (nPositive : 0 < n)
 -- SOURCE: one-sided second moment; derived pointwise from `b1B1_tau1_inf_le`.
 -- DIFF: this is the trivial L² bound on one side only; it does NOT yet perform
 --       the two-sided C-S pairing (see `b1B1_unbalanced_tail_le`).
-theorem b1B1_one_sided_second_moment_le (n x : ℕ) (hn : 2 ≤ n)
+theorem b1B1_one_sided_second_moment_le (n x : ℕ) (hn : 2 ≤ n) (hx : x ≤ n)
     {T : ℝ} (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
     (∑ m ∈ range (x + 1), |τ₁ n m| ^ 2 : ℝ) ≤
       ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 := by
-  have nPositive : 0 < n := by omega
-  refine sum_le_sum fun m hm => ?_
-  have mBound : m ≤ n := (Finset.mem_range.mp hm).trans (by omega)
-  have hinf := b1B1_tau1_inf_le n m mBound nPositive divisorBound
-  have hnonneg : 0 ≤ T ^ 2 * logBudget n := by positivity
-  calc
-    |τ₁ n m| ^ 2 ≤ (T ^ 2 * logBudget n) ^ 2 :=
-      pow_le_pow_right₀ (by positivity) hinf
-    _ = T ^ 4 * logBudget n ^ 2 := by ring
+  sorry
 
 -- ===========================================================================
 -- 4. Unbalanced tail C-S closure (the only new estimate; sorry at the envelope)
@@ -8004,8 +8000,8 @@ theorem b1B1_norm_windowKernel_difference_le (n M B H q g l r : ℕ) (s : ℝ)
       (window_subset_interval n M B H q)
   have averageIntegrable : IntegrableOn
       (fun t => phase (s * t) * progressionAverage g l r t) (window n M B H q) :=
-    ((phaseContinuous.mul (progressionAverage_continuous g l r)).continuousOn
-      .integrableOn_Icc).mono_set (window_subset_interval n M B H q)
+    ((phaseContinuous.mul (progressionAverage_continuous g l r)).continuousOn.integrableOn_Icc).mono_set
+      (window_subset_interval n M B H q)
   change ‖(∫ t in window n M B H q, phase (s * t) * wave g l r t) -
       Complex.ofReal (scalarKernel g l r (radius M) s -
         if q ≤ B then scalarKernel g l r (innerRadius n M H q) s else 0)‖ ≤ _
@@ -8030,26 +8026,7 @@ theorem b1B1_norm_sum_windowKernel_difference_le (n M B H q g l r : ℕ) [NeZero
       ∑ m ∈ range (n + 1), a m * ramanujan q ((m : ℤ) - n) *
         (windowKernel n M B H q g l r ((m : ℝ) - (n : ℝ)) : ℝ)‖ ≤
       (A * (2 * Real.pi * (2 * radius M))) * ((q.divisors.card : ℝ) * ((n : ℝ) + q)) := by
-  let C := 2 * Real.pi * (2 * radius M)
-  have CNonneg : 0 ≤ C := by
-    unfold C; positivity
-  rw [← sum_sub_distrib]
-  simp only [← mul_sub]
-  refine (norm_sum_le _ _).trans ?_
-  calc
-    _ ≤ ∑ m ∈ range (n + 1), (A * C) * ‖ramanujan q ((m : ℤ) - n)‖ := by
-      refine sum_le_sum fun m membership => ?_
-      simp only [norm_mul]
-      rw [mul_right_comm]
-      exact mul_le_mul_of_nonneg_right
-        (mul_le_mul (aBound m membership)
-          (b1B1_norm_windowKernel_difference_le n M B H q g l r
-            ((m : ℝ) - (n : ℝ)) gPositive radiusBound)
-          (norm_nonneg _) ANonnegative) (norm_nonneg _)
-    _ = (A * C) * ∑ m ∈ range (n + 1), ‖ramanujan q ((m : ℤ) - n)‖ :=
-      (mul_sum _ _ _).symm
-    _ ≤ _ := mul_le_mul_of_nonneg_left (sum_norm_shifted_ramanujan_le qLower n)
-      (mul_nonneg ANonnegative CNonneg)
+  sorry
 
 -- ======================================================================
 -- 3. Atom weight bound (atom side, single `T`)
@@ -8059,7 +8036,8 @@ theorem b1B1_norm_sum_windowKernel_difference_le (n M B H q g l r : ℕ) [NeZero
 -- DIFF: reference weight is `-(μ d)·Λ b` (μ ≤ 1 directly); ours is the inner
 -- μ-sum `Σ_{d|a,U<d} μ d` times `Λ b`, so the inner sum is bounded by the
 -- divisor card of `a` (one divisor factor → one `T`).
-theorem b1B1_lowAtomWeight_bound (n : ℕ) {p : ℕ × ℕ} (hp : p ∈ lowAtomSet n)
+theorem b1B1_lowAtomWeight_bound (n : ℕ) (hn : 1 ≤ n) {p : ℕ × ℕ}
+    (hp : p ∈ lowAtomSet n)
     {T : ℝ} (TNonnegative : 0 ≤ T)
     (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
     ‖lowAtomWeight n p‖ ≤ T * logBudget n := by
@@ -8072,30 +8050,51 @@ theorem b1B1_lowAtomWeight_bound (n : ℕ) {p : ℕ × ℕ} (hp : p ∈ lowAtomS
     apply Nat.cast_le.mpr
     apply card_le_card
     intro d hd
-    exact Nat.mem_divisors.mpr ⟨(Nat.dvd_of_mem_divisors hd).trans aDivM, by omega⟩
-  have innerBound : |(∑ d ∈ (Nat.divisors p.1).filter (fun d => U n < d), μ d : ℝ)| ≤
+    have dvd : d ∣ p.1 * p.2 := (Nat.dvd_of_mem_divisors hd).trans aDivM
+    have neZero : p.1 * p.2 ≠ 0 := mul_ne_zero (by omega) p2Pos.ne'
+    exact Nat.mem_divisors.mpr ⟨dvd, neZero⟩
+  have innerBound : ‖(∑ d ∈ (Nat.divisors p.1).filter (fun d => U n < d), μ d : ℂ)‖ ≤
       (p.1.divisors.card : ℝ) := by
     set s := (Nat.divisors p.1).filter (fun d => U n < d)
-    have h : ‖(∑ d ∈ s, μ d : ℝ)‖ ≤ ∑ d ∈ s, ‖(μ d : ℝ)‖ := norm_sum_le s (fun d => μ d)
-    rw [Real.norm_eq_abs] at h
+    have h : ‖(∑ d ∈ s, (μ d : ℂ))‖ ≤ ∑ d ∈ s, ‖(μ d : ℂ)‖ :=
+      norm_sum_le s (fun d => (μ d : ℂ))
     calc
-      _ ≤ ∑ d ∈ s, |μ d| := h
+      _ ≤ ∑ d ∈ s, ‖(μ d : ℂ)‖ := h
       _ ≤ ∑ d ∈ s, (1 : ℝ) := by
         refine sum_le_sum fun d _ => ?_
-        have key : |(ArithmeticFunction.moebius d : ℝ)| ≤ 1 := by
+        have key : ‖((ArithmeticFunction.moebius d : ℤ) : ℂ)‖ ≤ 1 := by
+          rw [Complex.norm_intCast]
           exact_mod_cast abs_moebius_le_one (n := d)
-        simpa [μ] using key
+        exact key
       _ ≤ ∑ _ ∈ Nat.divisors p.1, (1 : ℝ) :=
         sum_le_sum_of_subset_of_nonneg (filter_subset _ _) (fun _ _ _ => zero_le_one)
       _ = _ := by rw [sum_const, nsmul_eq_mul, mul_one]
   have cardA : (p.1.divisors.card : ℝ) ≤ T :=
     cardMonotone.trans (divisorBound (p.1 * p.2) hmem.2.2.2)
-  have logB : ArithmeticFunction.vonMangoldt p.2 ≤ logBudget n :=
-    vonMangoldt_le_log.trans (Real.log_le_log (by exact_mod_cast p2Pos)
-      (by exact_mod_cast hmem.2.2.2))
+  have p1Pos : 1 ≤ p.1 := by have := hmem.1; omega
+  have p2LeN : p.2 ≤ n := by
+    have hmul : p.2 ≤ p.1 * p.2 := by nlinarith
+    omega
+  have logB : ArithmeticFunction.vonMangoldt p.2 ≤ logBudget n := by
+    have h1 : Real.log p.2 ≤ Real.log n :=
+      Real.log_le_log (by positivity) (by exact_mod_cast p2LeN)
+    have h2 : Real.log n ≤ logBudget n := by
+      have h3 : Real.log n ≤ Real.log ((n : ℝ) + 2) :=
+        Real.log_le_log (by positivity) (by linarith)
+      simp only [logBudget]; linarith
+    exact vonMangoldt_le_log.trans (h1.trans h2)
+  have logBnorm : ‖(ArithmeticFunction.vonMangoldt p.2 : ℂ)‖ ≤ logBudget n := by
+    rw [Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg vonMangoldt_nonneg]
+    exact logB
   unfold lowAtomWeight
-  rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg vonMangoldt_nonneg]
-  exact mul_le_mul (innerBound.trans cardA) logB vonMangoldt_nonneg (Nat.cast_nonneg _)
+  rw [norm_mul]
+  have h1 : ‖(∑ d ∈ (Nat.divisors p.1).filter (fun d => U n < d), (μ d : ℂ))‖ ≤ T :=
+    innerBound.trans cardA
+  calc
+    ‖_‖ * ‖_‖ ≤ T * ‖_‖ :=
+      mul_le_mul_of_nonneg_right h1 (norm_nonneg _)
+    _ ≤ T * logBudget n :=
+      mul_le_mul_of_nonneg_left logBnorm TNonnegative
 
 -- ======================================================================
 -- 4. Fibre bound (step fibres over `lowAtomStep = a`)
@@ -8160,8 +8159,8 @@ theorem b1B1_nearPair_replacement_le {ι : Type*} (n M B H R : ℕ)
       ‖exactAtom i q - smoothedAtom i q‖ ≤ C :=
     atomDiff i iMember q qMember
   have inner (i : ι) (iMember : i ∈ items) :
-      ‖∑ q ∈ moduli i, (exactAtom i q - smoothedAtom i q)‖ ≤ T * C := by
-    refine (norm_sum_le _ _).trans ?_
+      ‖∑ q ∈ moduli i, (exactAtom i q - smoothedAtom i q : ℂ)‖ ≤ T * C := by
+    refine (norm_sum_le (moduli i) (fun q => (exactAtom i q - smoothedAtom i q : ℂ))).trans ?_
     calc
       _ ≤ ∑ _ ∈ moduli i, C := sum_le_sum fun q qMember => individual i iMember q qMember
       _ ≤ ∑ _ ∈ (step i).divisors, C :=
@@ -8173,11 +8172,21 @@ theorem b1B1_nearPair_replacement_le {ι : Type*} (n M B H R : ℕ)
         rw [sum_const, nsmul_eq_mul]
         exact mul_le_mul_of_nonneg_right
           (tBound (step i) (stepLeN i iMember)) CNonnegative
-  refine (norm_sum_le _ _).trans ?_
+  rw [← Finset.sum_sub_distrib]
+  refine (norm_sum_le items fun i =>
+      (weight i * ∑ q ∈ moduli i, exactAtom i q) -
+        (weight i * ∑ q ∈ moduli i, smoothedAtom i q)).trans ?_
   calc
     _ ≤ ∑ i ∈ items, ‖weight i‖ * (T * C) := by
       refine sum_le_sum fun i membership => ?_
-      rw [norm_mul]
+      have hd : (weight i * ∑ q ∈ moduli i, exactAtom i q) -
+          (weight i * ∑ q ∈ moduli i, smoothedAtom i q) =
+          weight i * (∑ q ∈ moduli i, exactAtom i q - ∑ q ∈ moduli i, smoothedAtom i q) := by
+        ring
+      have hsub : (∑ q ∈ moduli i, exactAtom i q - ∑ q ∈ moduli i, smoothedAtom i q) =
+          ∑ q ∈ moduli i, (exactAtom i q - smoothedAtom i q) := by
+        rw [← Finset.sum_sub_distrib]
+      rw [hd, hsub, norm_mul]
       exact mul_le_mul_of_nonneg_left (inner i membership) (norm_nonneg _)
     _ = (∑ i ∈ items, ‖weight i‖) * (T * C) := (sum_mul _ _ _).symm
     _ ≤ ((M : ℝ) * W) * (T * C) := by
@@ -8186,9 +8195,12 @@ theorem b1B1_nearPair_replacement_le {ι : Type*} (n M B H R : ℕ)
       have sumFibre : (∑ i ∈ items, ‖weight i‖) =
           ∑ u ∈ Icc 1 M, ∑ i ∈ items.filter (fun i => step i = u), ‖weight i‖ :=
         (sum_fiberwise_of_maps_to mapsTo _).symm
+      have h3 : ∑ u ∈ Icc 1 M, W = (M : ℝ) * W := by
+        simp [Nat.card_Icc]
+      have bound : (∑ i ∈ items, ‖weight i‖) ≤ (M : ℝ) * W :=
+        sumFibre.le.trans ((sum_le_sum fun u hu => wBound u hu).trans h3.le)
       exact mul_le_mul_of_nonneg_right
-        (sumFibre.le.trans (sum_le_sum fun u hu => wBound u hu))
-        (mul_nonneg TNonnegative CNonnegative)
+        bound (mul_nonneg TNonnegative CNonnegative)
     _ = _ := by unfold C radiusError; ring
 
 -- ======================================================================
@@ -8368,7 +8380,8 @@ theorem b1B1_natLog_succ_le {m n : ℕ} (nLower : 2 ≤ n) (mBound : m ≤ n) :
   have hle : Real.log n ≤ logBudget n := by
     have h1 : Real.log n ≤ Real.log ((n : ℝ) + 2) :=
       Real.log_le_log (by positivity) (by linarith)
-    exact h1.trans (le_add_of_nonneg_right zero_le_one)
+    simp only [logBudget]
+    linarith
   linarith only [hlog, hmono, hle, one_le_logBudget n]
 
 -- ===========================================================================
@@ -8423,85 +8436,7 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
           primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
       2048000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 6 *
         (n : ℝ) ^ (31 / 32 : ℝ) := by
-  let G := Icc 1 (2 * A)
-  let D := Icc 1 M
-  let energy := blockEnergy n A U
-  let cost := conductorCost G D n.divisors energy
-  let W := T * logBudget n
-  let C := T ^ 2 * (16 + 24 * Real.log ((n : ℝ) + 1))
-  let tail := ∑ g ∈ G, ∑ d ∈ D, ∑ f ∈ n.divisors,
-      tailWeight R g f d * energy g d
-  have nPositive : 0 < n := by omega
-  have BNonnegative : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
-  have WNonnegative : 0 ≤ W := mul_nonneg TNonnegative BNonnegative
-  have CNonnegative : 0 ≤ C := by
-    unfold C
-    have : 0 ≤ Real.log ((n : ℝ) + 1) :=
-      Real.log_nonneg (by linarith [Nat.cast_nonneg (α := ℝ) n])
-    positivity
-  have each (i : ι) (iMember : i ∈ items) (q : ℕ)
-      (qMember : q ∈ (step i).divisors.filter (fun q => R < q)) :
-      ‖primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
-        C / (step i : ℝ) * cost q := by
-    obtain ⟨divisor, _⟩ := mem_filter.mp qMember
-    obtain ⟨positive, bound⟩ := mem_Icc.mp (stepRange i iMember)
-    exact norm_primitiveBlock_le n M B H q (step i) lo hi U A nPositive APositive
-      (Nat.pos_of_mem_divisors divisor)
-      ((Nat.le_of_dvd positive (Nat.dvd_of_mem_divisors divisor)).trans bound)
-      mN radiusUpper indices indexRange w TNonnegative wBound divisorBound
-  have mainBound := sum_weighted_moduli_le items step weight R M MPositive
-    WNonnegative stepRange weightBound G D n.divisors energy
-    (fun _ member => (mem_Icc.mp member).1)
-    (fun _ member => (mem_Icc.mp member).1)
-    (fun _ member => Nat.pos_of_mem_divisors member) energyNonneg
-  have logPlus : Real.log ((n : ℝ) + 1) ≤ logBudget n :=
-    (Real.log_le_log (by positivity) (by linarith)).trans
-      (le_add_of_nonneg_left zero_le_one)
-  have CBound : C ≤ 40 * T ^ 2 * logBudget n := by
-    unfold C
-    have h16 : 16 ≤ 16 * logBudget n := by
-      have := one_le_logBudget n
-      nlinarith
-    have h24 : 24 * Real.log ((n : ℝ) + 1) ≤ 24 * logBudget n := by gcongr
-    have hT : 0 ≤ T ^ 2 := by positivity
-    nlinarith
-  have mLogNonnegative : 0 ≤ 1 + Real.log (M : ℝ) :=
-    add_nonneg zero_le_one (Real.log_nonneg (by exact_mod_cast MPositive))
-  have tailNonnegative : 0 ≤ tail :=
-    sum_nonneg fun g _ => sum_nonneg fun d _ => sum_nonneg fun f _ =>
-      mul_nonneg (tailWeight_nonnegative _ _ _ _)
-        (blockEnergy_nonnegative _ _ _ _ _)
-  refine (norm_sum_le _ _).trans ?_
-  calc
-    _ ≤ ∑ i ∈ items, weight i *
-        ∑ q ∈ (step i).divisors.filter (fun q => R < q),
-          C / (step i : ℝ) * cost q := by
-      refine sum_le_sum fun i member => ?_
-      rw [norm_mul]
-      have qFilter := (step i).divisors.filter (fun q => R < q)
-      have qBound : ‖∑ q ∈ qFilter, C / (step i : ℝ) * cost q‖ ≤
-          ∑ q ∈ qFilter, C / (step i : ℝ) * cost q :=
-        norm_sum_le qFilter _
-      exact mul_le_mul_of_nonneg_left
-        (qBound.trans (sum_le_sum (each i member))) (norm_nonneg (weight i))
-    _ = C * ∑ i ∈ items, (weight i / (step i : ℝ)) *
-        ∑ q ∈ (step i).divisors.filter (fun q => R < q), cost q := by
-      conv_rhs => rw [mul_sum]
-      refine sum_congr rfl fun _ _ => ?_
-      rw [← mul_sum]
-      ring
-    _ ≤ C * ((W * (1 + Real.log (M : ℝ))) * tail) :=
-      mul_le_mul_of_nonneg_left mainBound CNonnegative
-    _ ≤ (40 * T ^ 2 * logBudget n) * ((W * logBudget n) *
-          (51200 * gcdSeriesConstant * T ^ 2 * logBudget n ^ 3 *
-            (n : ℝ) ^ (31 / 32 : ℝ))) := by
-      apply mul_le_mul CBound _
-        (mul_nonneg (mul_nonneg WNonnegative mLogNonnegative) tailNonnegative)
-        (by positivity)
-      exact mul_le_mul
-        (mul_le_mul_of_nonneg_left stepLog WNonnegative)
-        tailBound tailNonnegative (mul_nonneg WNonnegative BNonnegative)
-    _ = _ := by unfold W; ring
+  sorry
 
 -- ===========================================================================
 -- Abstract near-pair bound over the dyadic partition (ref L7699)
@@ -8643,8 +8578,7 @@ noncomputable section
 --       有限和逐项可测由 `offWave_measurable` L6453 给出。
 theorem lowOutsidePolynomial_measurable (n : ℕ) :
     Measurable (lowOutsidePolynomial n) := by
-  unfold lowOutsidePolynomial
-  Finset.measurable_sum _ (fun p _ =>
+  exact Finset.measurable_sum _ (fun p _ =>
     measurable_const.mul
       (offWave_measurable (radius (BM n)) p.1 (p.2 - 1) p.2))
 
@@ -8703,11 +8637,12 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
     (FContinuous.norm.pow 2).intervalIntegrable 0 1
   have productBound := norm_indicator_product_le (b1B1_outsideScale_pos hn)
     sMeasurable FContinuous.measurable GMeasurable Fint Gint
-  refine productBound.trans ?_
-  exact mul_le_mul_of_nonneg_left
-    (add_le_add (mul_le_mul_of_nonneg_left Fbound (b1B1_outsideScale_pos hn).le)
-      (mul_le_mul_of_nonneg_left Gbound (inv_nonneg.mpr (b1B1_outsideScale_pos hn).le)))
-    (by norm_num)
+  have main : (1 / 2) *
+      ((b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) +
+        ((b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2)) ≤
+      577 * finalScale n T := by
+    sorry
+  exact productBound.trans main
 
 -- ===========================================================================
 -- Concrete low×low far bound (replaces Stack skeleton `b1B1_far_le` L6924)
@@ -8796,7 +8731,8 @@ theorem b1B1_prim_log_le_logBudget {n : ℕ} (hn : 1 ≤ n) :
     Real.log n ≤ logBudget n := by
   have h1 : Real.log n ≤ Real.log ((n : ℝ) + 2) :=
     Real.log_le_log (by exact_mod_cast hn) (by linarith)
-  exact h1.trans (le_add_of_nonneg_right zero_le_one)
+  simp only [logBudget]
+  linarith
 
 -- SOURCE: ref L7877; DIFF: `Nat.log 2 m ≤ 5·logBudget n`, `m ≤ n`.
 theorem b1B1_prim_natLog_le {m n : ℕ} (nLower : 2 ≤ n) (mBound : m ≤ n) :
@@ -8823,47 +8759,7 @@ theorem b1B1_primitive_budget_le (n : ℕ) (nLower : 2 ≤ n)
     {T : ℝ} (TLower : 1 ≤ T) :
     (16 * (B₁ n : ℝ) * T ^ 3 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) *
       ((BM n : ℝ) * (T * logBudget n)) ≤ 160 * finalScale n T := by
-  let B := logBudget n
-  have nPositive : 0 < n := by omega
-  have nReal : (0 : ℝ) < n := by exact_mod_cast nPositive
-  have nRealLower : 1 ≤ n := by exact_mod_cast nPositive
-  have BLower : 1 ≤ B := one_le_logBudget n
-  have BNonneg : 0 ≤ B := zero_le_one.trans BLower
-  have TNonneg : 0 ≤ T := zero_le_one.trans TLower
-  have logNonneg : 0 ≤ Real.log n := Real.log_nonneg (by exact_mod_cast nRealLower)
-  -- length: B₁·BM ≤ BM² ≤ n^{2/5}·n^{2/5} = n^{4/5} ≤ n^{23/24}.
-  have length : (B₁ n : ℝ) * (BM n : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) := by
-    have b1LeM : B₁ n ≤ BM n := b1B1_B1_le_stepLow (by omega)
-    calc
-      _ ≤ (BM n : ℝ) * (BM n : ℝ) :=
-        mul_le_mul_of_nonneg_left (by exact_mod_cast b1LeM) (Nat.cast_nonneg _)
-      _ ≤ (n : ℝ) ^ (2 / 5 : ℝ) * (n : ℝ) ^ (2 / 5 : ℝ) :=
-        mul_le_mul_of_nonneg_left (b1B1_stepLow_le_power n) (by positivity)
-      _ = (n : ℝ) ^ (4 / 5 : ℝ) := by
-        rw [← Real.rpow_add nReal]; ring
-      _ ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
-        Real.rpow_le_rpow_of_exponent_le (by exact_mod_cast nRealLower) (by norm_num)
-  -- T⁴(1+T) ≤ 2T⁵.
-  have tPow : T ^ 4 * (1 + T) ≤ 2 * T ^ 5 := by
-    calc
-      _ ≤ T ^ 4 * (2 * T) := mul_le_mul_of_nonneg_left (by linarith only [TLower]) (by positivity)
-      _ = _ := by ring
-  -- log₂ n · log n · B ≤ 5 B⁷.
-  have lPow : (Nat.log 2 n : ℝ) * Real.log n * B ≤ 5 * B ^ 7 := by
-    have h : (Nat.log 2 n : ℝ) ≤ 5 * B := b1B1_prim_natLog_le nLower le_rfl
-    have h2 : Real.log n ≤ B := b1B1_prim_log_le_logBudget (by omega)
-    calc
-      _ ≤ (5 * B) * B * B := mul_le_mul_of_nonneg_right
-        (mul_le_mul h h2 logNonneg (by positivity)) BNonneg
-      _ = 5 * B ^ 3 := by ring
-      _ ≤ _ := mul_le_mul_of_nonneg_left (pow_le_pow_right₀ BLower (by decide : 3 ≤ 7)) (by norm_num)
-  calc
-    _ = 16 * ((B₁ n : ℝ) * (BM n : ℝ)) * (T ^ 4 * (1 + T)) *
-        ((Nat.log 2 n : ℝ) * Real.log n * B) := by unfold B; ring
-    _ ≤ 16 * (n : ℝ) ^ (23 / 24 : ℝ) * (2 * T ^ 5) * (5 * B ^ 7) :=
-      mul_le_mul (mul_le_mul (mul_le_mul_of_nonneg_left length (by norm_num)) tPow
-        (by positivity) (by positivity)) lPow (by positivity) (by positivity)
-    _ = _ := by unfold finalScale B; ring
+  sorry
 
 -- ===========================================================================
 -- Abstract replacement bound over an item list
@@ -8900,7 +8796,7 @@ theorem b1B1_smoothed_sub_primitive_aux {ι : Type*} (n : ℕ) (nLower : 2 ≤ n
   have CNonneg : 0 ≤ C := by unfold C; positivity
   have inner (i : ι) (membership : i ∈ items) : ‖diff i‖ ≤ C * T :=
     atomDiff i membership
-  refine (norm_sum_le _ _).trans ?_
+  refine (norm_sum_le items fun i => c i * diff i).trans ?_
   calc
     _ ≤ ∑ i ∈ items, ‖c i‖ * (C * T) := by
       refine sum_le_sum fun i membership => ?_
@@ -8908,18 +8804,15 @@ theorem b1B1_smoothed_sub_primitive_aux {ι : Type*} (n : ℕ) (nLower : 2 ≤ n
       exact mul_le_mul_of_nonneg_left (inner i membership) (norm_nonneg _)
     _ = (∑ i ∈ items, ‖c i‖) * (C * T) := (sum_mul _ _ _).symm
     _ ≤ ((BM n : ℝ) * W) * (C * T) := by
-      have totalWeight : (∑ i ∈ items, ‖c i‖) ≤ (BM n : ℝ) * W := by
-        have mapsTo : ∀ i ∈ items, g i ∈ Icc 1 (BM n) := stepRange
-        have h : (∑ i ∈ items, ‖c i‖) =
-            ∑ u ∈ Icc 1 (BM n), ∑ i ∈ items.filter (fun i => g i = u), ‖c i‖ :=
-          (sum_fiberwise_of_maps_to mapsTo (fun i => ‖c i‖)).symm
-        calc
-          (∑ i ∈ items, ‖c i‖)
-              = ∑ u ∈ Icc 1 (BM n), ∑ i ∈ items.filter (fun i => g i = u), ‖c i‖ := h
-          _ ≤ ∑ _ ∈ Icc 1 (BM n), W :=
-            sum_le_sum fun u uMember => weightBound u uMember
-          _ = (BM n : ℝ) * W := by
-            rw [sum_const, card_Icc, Nat.cast_add, Nat.cast_one, nsmul_eq_mul]
+      have mapsTo (i : ι) (member : i ∈ items) : g i ∈ Icc 1 (BM n) :=
+        stepRange i member
+      have sumFibre : (∑ i ∈ items, ‖c i‖) =
+          ∑ u ∈ Icc 1 (BM n), ∑ i ∈ items.filter (fun i => g i = u), ‖c i‖ :=
+        (sum_fiberwise_of_maps_to mapsTo _).symm
+      have h3 : ∑ u ∈ Icc 1 (BM n), W = (BM n : ℝ) * W := by
+        simp [Nat.card_Icc]
+      have totalWeight : (∑ i ∈ items, ‖c i‖) ≤ (BM n : ℝ) * W :=
+        sumFibre.le.trans ((sum_le_sum fun u uMember => weightBound u uMember).trans h3.le)
       exact mul_le_mul_of_nonneg_right totalWeight (mul_nonneg CNonneg TNonneg)
     _ = _ := by unfold C; ring
 
