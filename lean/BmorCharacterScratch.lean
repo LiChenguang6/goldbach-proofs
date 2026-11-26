@@ -1704,4 +1704,152 @@ theorem zero_free_gap_from_positive_combination
   rw [div_div] at h
   linarith only [h]
 
+
+/- Absolute-convergence bound on a variable right contour.  It avoids
+   the loss of a full factor of x from fixing Re(s)=2 in the truncation.
+   The constant comes from Mathlib's Chebyshev estimate. -/
+noncomputable def absoluteTwistCoeff {q : ℕ} (χ : DirichletCharacter ℂ q) (k : ℕ) : ℂ :=
+  (‖twistCoeff χ k‖ : ℂ)
+
+theorem absoluteTwistCoeff_bigO {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) :
+    (fun n : ℕ => ∑ k ∈ Finset.Icc 1 n, ‖absoluteTwistCoeff χ k‖) =O[atTop]
+      (fun n : ℕ => (n:ℝ)^(1:ℝ)) := by
+  simpa only [absoluteTwistCoeff, Complex.norm_real, Real.norm_eq_abs,
+    abs_of_nonneg (norm_nonneg _)] using twistCoeff_sum_norm_bigO χ
+
+theorem absoluteTwistCoeff_term {q : ℕ} (χ : DirichletCharacter ℂ q)
+    (c t : ℝ) (k : ℕ) :
+    LSeries.term (absoluteTwistCoeff χ) (c:ℂ) k =
+      (‖LSeries.term (twistCoeff χ) ((c:ℂ)+(t:ℂ)*Complex.I) k‖ : ℂ) := by
+  rw [LSeries_term_vertical_norm]
+  by_cases hk : k = 0
+  · subst k
+    simp
+  have hk' : (0:ℝ) < k := by exact_mod_cast Nat.pos_of_ne_zero hk
+  rw [LSeries.term_of_ne_zero hk, LSeries.norm_term_eq, if_neg hk, absoluteTwistCoeff]
+  rw [Complex.ofReal_re, Complex.ofReal_div, ← Complex.ofReal_cpow hk'.le,
+    Complex.ofReal_natCast]
+
+theorem absoluteTwist_LSeries_bound {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (c : ℝ) (hc : 1 < c) :
+    ‖LSeries (absoluteTwistCoeff χ) (c:ℂ)‖ ≤
+      (Real.log 4+4)*c/(c-1) := by
+  have hC : 0 ≤ Real.log 4+4 := by positivity
+  have h := LSeries_eq_mul_integral' (absoluteTwistCoeff χ)
+    (by norm_num : (0:ℝ) ≤ 1) (show 1 < (c:ℂ).re from hc)
+    (absoluteTwistCoeff_bigO χ)
+  rw [h, norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_pos (by linarith : 0<c)]
+  have hi := (integrableOn_Ioi_rpow_of_lt (a := -c) (by linarith)
+    (by norm_num : (0:ℝ)<1)).const_mul (Real.log 4+4)
+  have hb : ‖∫ t in Set.Ioi (1:ℝ),
+        (∑ k ∈ Finset.Icc 1 ⌊t⌋₊, absoluteTwistCoeff χ k) * (t:ℂ)^(-((c:ℂ)+1))‖ ≤
+      ∫ t in Set.Ioi (1:ℝ), (Real.log 4+4)*t^(-c) := by
+    apply norm_integral_le_of_norm_le hi
+    filter_upwards [ae_restrict_mem measurableSet_Ioi] with t ht
+    have ht' : 0<t := zero_lt_one.trans ht
+    have hsum : ‖∑ k ∈ Finset.Icc 1 ⌊t⌋₊, absoluteTwistCoeff χ k‖ ≤
+        (Real.log 4+4)*t := by
+      apply (norm_sum_le _ _).trans
+      have he : (∑ k ∈ Finset.Icc 1 ⌊t⌋₊, ‖absoluteTwistCoeff χ k‖) =
+          ∑ k ∈ Finset.Icc 1 ⌊t⌋₊, ‖twistCoeff χ k‖ := by
+        simp [absoluteTwistCoeff]
+      rw [he]
+      exact (twistCoeff_sum_norm_le χ _).trans
+        (mul_le_mul_of_nonneg_left (Nat.floor_le ht'.le) hC)
+    rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos ht']
+    simp only [Complex.neg_re, Complex.add_re, Complex.ofReal_re, Complex.one_re]
+    calc
+      _ ≤ ((Real.log 4+4)*t)*t^(-(c+1)) :=
+        mul_le_mul_of_nonneg_right hsum (Real.rpow_nonneg ht'.le _)
+      _ = _ := by
+        rw [mul_assoc, ← Real.rpow_one t, ← Real.rpow_add ht']
+        norm_num [show 1 + -(c+1) = -c by ring]
+  rw [integral_const_mul, integral_Ioi_rpow_of_lt (a := -c) (by linarith)
+    (by norm_num : (0:ℝ)<1), Real.one_rpow] at hb
+  have he : (Real.log 4+4)*(-1/(-c+1)) = (Real.log 4+4)/(c-1) := by
+    rw [show -c+1 = -(c-1) by ring, neg_div_neg_eq]
+    ring
+  rw [he] at hb
+  exact (mul_le_mul_of_nonneg_left hb (by linarith)).trans_eq (by ring)
+
+theorem negLogDerivative_near_one_bound {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (c t : ℝ) (hc : 1 < c) :
+    ‖-deriv (DirichletCharacter.LFunction χ) ((c:ℂ)+(t:ℂ)*Complex.I) /
+        DirichletCharacter.LFunction χ ((c:ℂ)+(t:ℂ)*Complex.I)‖ ≤
+      (Real.log 4+4)*c/(c-1) := by
+  have hs : 1 < ((c:ℂ)+(t:ℂ)*Complex.I).re := by simpa [Complex.mul_re] using hc
+  rw [← twistLSeries_eq_logDeriv χ _ hs]
+  have hS := LSeriesSummable_of_sum_norm_bigO (twistCoeff_sum_norm_bigO χ)
+    (by norm_num : (0:ℝ) ≤ 1) hs
+  calc
+    _ ≤ ∑' k, ‖LSeries.term (twistCoeff χ) ((c:ℂ)+(t:ℂ)*Complex.I) k‖ :=
+      norm_tsum_le_tsum_norm hS.norm
+    _ = ‖LSeries (absoluteTwistCoeff χ) (c:ℂ)‖ := by
+      unfold LSeries
+      simp_rw [absoluteTwistCoeff_term χ c t]
+      rw [← Complex.ofReal_tsum, Complex.norm_real, Real.norm_eq_abs,
+        abs_of_nonneg (tsum_nonneg fun _ => norm_nonneg _)]
+    _ ≤ _ := absoluteTwist_LSeries_bound χ c hc
+
+/-- At the standard near-one abscissa x^c = e*x, exactly. -/
+theorem perron_near_one_scale (x : ℝ) (hx : 1 < x) :
+    x^(1+1/Real.log x) = Real.exp 1*x := by
+  have hl : 0 < Real.log x := Real.log_pos hx
+  rw [Real.rpow_def_of_pos (by linarith : 0<x),
+    show Real.log x * (1+1/Real.log x) = 1+Real.log x by
+      field_simp [hl.ne']; ring,
+    Real.exp_add, Real.exp_log (by linarith)]
+
+theorem perron_near_one_integrand_bound {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (x t : ℝ) (hx : 1 < x) :
+    let c := 1+1/Real.log x
+    ‖perronKernel x c t *
+        (-deriv (DirichletCharacter.LFunction χ) ((c:ℂ)+(t:ℂ)*Complex.I) /
+          DirichletCharacter.LFunction χ ((c:ℂ)+(t:ℂ)*Complex.I))‖ ≤
+      Real.exp 1*x*(Real.log 4+4)*(1+Real.log x)/(1+t^2) := by
+  dsimp only
+  let c := 1+1/Real.log x
+  have hl := Real.log_pos hx
+  have hc : 1 < c := by dsimp [c]; linarith [one_div_pos.mpr hl]
+  change ‖perronKernel x c t * _‖ ≤ _
+  have hK := perronKernel_global_bound x c t (by linarith) hc.le
+  have hL := negLogDerivative_near_one_bound χ c t hc
+  rw [norm_mul]
+  calc
+    _ ≤ (x^c*(1+t^2)⁻¹)*((Real.log 4+4)*c/(c-1)) :=
+      mul_le_mul hK hL (norm_nonneg _) (by positivity)
+    _ = _ := by
+      dsimp [c]
+      rw [perron_near_one_scale x hx]
+      field_simp [hl.ne', show 1+t^2 ≠ 0 by positivity]
+      <;> ring
+
+/-- One-sided truncation error at the near-one contour.  In contrast
+    to the previous x^2 integrand bound, this is O(x log x/T). -/
+theorem perron_near_one_tail_bound {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (x T : ℝ) (hx : 1 < x) (hT : 0<T) :
+    let c := 1+1/Real.log x
+    ‖∫ t in Set.Ioi T, perronKernel x c t *
+        (-deriv (DirichletCharacter.LFunction χ) ((c:ℂ)+(t:ℂ)*Complex.I) /
+          DirichletCharacter.LFunction χ ((c:ℂ)+(t:ℂ)*Complex.I))‖ ≤
+      Real.exp 1*x*(Real.log 4+4)*(1+Real.log x)/T := by
+  dsimp only
+  let c := 1+1/Real.log x
+  let D := Real.exp 1*x*(Real.log 4+4)*(1+Real.log x)
+  have hD : 0 ≤ D := by dsimp [D]; positivity
+  have hi := (integrableOn_Ioi_rpow_of_lt (by norm_num : (-2:ℝ)< -1) hT).const_mul D
+  change ‖∫ t in Set.Ioi T, perronKernel x c t * _‖ ≤ D/T
+  calc
+    _ ≤ ∫ t in Set.Ioi T, D*t^(-2:ℝ) := by
+      apply norm_integral_le_of_norm_le hi
+      filter_upwards [ae_restrict_mem measurableSet_Ioi] with t ht
+      have ht' : 0<t := hT.trans ht
+      apply (perron_near_one_integrand_bound χ x t hx).trans
+      change D/(1+t^2) ≤ D*t^(-2:ℝ)
+      rw [Real.rpow_neg ht'.le, Real.rpow_two, div_eq_mul_inv]
+      exact mul_le_mul_of_nonneg_left (inv_anti₀ (sq_pos_of_ne_zero ht'.ne') (by linarith)) hD
+    _ = D/T := by
+      rw [integral_const_mul, integral_Ioi_rpow_of_lt (by norm_num) hT]
+      norm_num [div_eq_mul_inv, Real.rpow_neg_one]
+
 end BmorScratch
