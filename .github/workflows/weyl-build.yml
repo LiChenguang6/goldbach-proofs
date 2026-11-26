@@ -1,0 +1,40 @@
+# Build-only CI for the self-contained Weyl infrastructure layer.
+# It does not submit anything: no PR, no claim. It just type-checks the
+# `PEqualNP.Weyl` modules on a runner so the heavy Mathlib build happens in
+# the cloud instead of on a local machine.
+name: weyl-build
+
+on:
+  push:
+    branches: [weyl-infra]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weyl-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Install the pinned toolchain and fetch the Mathlib cache
+        working-directory: lean
+        run: |
+          "$HOME/.elan/bin/elan" toolchain install "$(cat lean-toolchain)"
+          "$HOME/.elan/bin/lake" exe cache get
+
+      - name: Build the Weyl layer
+        working-directory: lean
+        run: |
+          time "$HOME/.elan/bin/lake" build PEqualNP.Weyl.BlockBound
