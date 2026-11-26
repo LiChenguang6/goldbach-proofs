@@ -1,0 +1,27 @@
+name: Isolated FW-8007 Lean check
+on:
+  push:
+    branches: [test/lean-fw8007-cloud]
+    paths:
+      - 'lean/PEqualNP/Outside/L_goldbach_factor_line_fiber_determinant.lean'
+      - '.github/workflows/fw8007-cloud.yml'
+permissions:
+  contents: read
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Elan
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Fetch pinned Mathlib and cache
+        working-directory: lean
+        run: |
+          lean --version
+          lake exe cache get
+      - name: Elaborate proof
+        working-directory: lean
+        run: lake env lean PEqualNP/Outside/L_goldbach_factor_line_fiber_determinant.lean
