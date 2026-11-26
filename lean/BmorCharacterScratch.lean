@@ -1586,4 +1586,119 @@ theorem theta_frozen_of_bmor
   exact (hsmall q (a%q) hq3 hq' (Nat.mod_lt _ (by omega)) hred).trans
     (by linarith)
 
+
+/- The de la Vallee Poussin positivity inequality for the negative
+   logarithmic derivatives, with no GRH assumption.  This is the analytic
+   input for excluding zeros close to the line Re s = 1. -/
+theorem trigonometric_polynomial_nonnegative (z : ℂ) (hz : ‖z‖ = 1) :
+    0 ≤ 3 + 4*z.re + (z^2).re := by
+  rw [pow_two, Complex.mul_re]
+  have h := Complex.sq_norm z
+  rw [hz, Complex.normSq_apply] at h
+  nlinarith [sq_nonneg (z.re+1)]
+
+theorem logDerivative_term_positive {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (σ t : ℝ) (k : ℕ) :
+    0 ≤ 3 * (LSeries.term (twistCoeff (1 : DirichletCharacter ℂ q))
+        (σ:ℂ) k).re +
+      4 * (LSeries.term (twistCoeff χ) ((σ:ℂ)+Complex.I*(t:ℂ)) k).re +
+      (LSeries.term (twistCoeff (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ)) k).re := by
+  by_cases hk : k = 0
+  · subst k
+    simp
+  have hk' : 0 < (k:ℝ) := by exact_mod_cast Nat.pos_of_ne_zero hk
+  by_cases hu : IsUnit (k : ZMod q)
+  · let z : ℂ := χ (k:ZMod q) * (k:ℂ)^(-(Complex.I*(t:ℂ)))
+    let a : ℝ := ArithmeticFunction.vonMangoldt k * (k:ℝ)^(-σ)
+    have ha : 0 ≤ a := mul_nonneg ArithmeticFunction.vonMangoldt_nonneg
+      (Real.rpow_nonneg hk'.le _)
+    have hz : ‖z‖ = 1 := by
+      unfold z
+      rw [norm_mul, ← hu.unit_spec, χ.unit_norm_eq_one hu.unit, one_mul]
+      rw [← Complex.ofReal_natCast k, Complex.norm_cpow_eq_rpow_re_of_pos hk']
+      simp [Complex.mul_re]
+    have h0 : LSeries.term (twistCoeff (1 : DirichletCharacter ℂ q))
+        (σ:ℂ) k = (a:ℂ) := by
+      rw [LSeries.term_of_ne_zero hk, twistCoeff, MulChar.one_apply hu, one_mul,
+        div_eq_mul_inv, ← Complex.cpow_neg]
+      simp [a, Complex.ofReal_mul, Complex.ofReal_cpow hk'.le]
+    have h1 : LSeries.term (twistCoeff χ) ((σ:ℂ)+Complex.I*(t:ℂ)) k =
+        (a:ℂ)*z := by
+      rw [LSeries.term_of_ne_zero hk, twistCoeff, div_eq_mul_inv, ← Complex.cpow_neg,
+        neg_add, Complex.cpow_add _ _ (by exact_mod_cast hk)]
+      simp only [a,z,Complex.ofReal_mul,Complex.ofReal_cpow hk'.le,
+        Complex.ofReal_natCast,Complex.ofReal_neg]
+      ring
+    have h2 : LSeries.term (twistCoeff (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ)) k =
+        (a:ℂ)*z^2 := by
+      rw [LSeries.term_of_ne_zero hk, twistCoeff, div_eq_mul_inv, ← Complex.cpow_neg,
+        neg_add, Complex.cpow_add _ _ (by exact_mod_cast hk),
+        χ.pow_apply' two_ne_zero,
+        show -(2*Complex.I*(t:ℂ)) = (2:ℕ)*(-(Complex.I*(t:ℂ))) by push_cast; ring,
+        Complex.cpow_nat_mul]
+      simp only [a,z,Complex.ofReal_mul,Complex.ofReal_cpow hk'.le,
+        Complex.ofReal_natCast,Complex.ofReal_neg]
+      ring
+    rw [h0,h1,h2]
+    simp only [Complex.ofReal_re,Complex.mul_re,Complex.ofReal_im,zero_mul,sub_zero]
+    have h := mul_nonneg ha (trigonometric_polynomial_nonnegative z hz)
+    linarith only [h]
+  · simp [LSeries.term_of_ne_zero hk,twistCoeff,MulChar.map_nonunit _ hu]
+
+theorem logDerivative_positive_combination {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (σ t : ℝ) (hσ : 1 < σ) :
+    0 ≤ 3 * (-deriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q))
+          (σ:ℂ) / DirichletCharacter.LFunction 1 (σ:ℂ)).re +
+      4 * (-deriv (DirichletCharacter.LFunction χ) ((σ:ℂ)+Complex.I*(t:ℂ)) /
+          DirichletCharacter.LFunction χ ((σ:ℂ)+Complex.I*(t:ℂ))).re +
+      (-deriv (DirichletCharacter.LFunction (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ)) /
+          DirichletCharacter.LFunction (χ^2) ((σ:ℂ)+2*Complex.I*(t:ℂ))).re := by
+  have hs0 : 1 < (σ:ℂ).re := hσ
+  have hs1 : 1 < ((σ:ℂ)+Complex.I*(t:ℂ)).re := by
+    simpa [Complex.add_re,Complex.mul_re] using hσ
+  have hs2 : 1 < ((σ:ℂ)+2*Complex.I*(t:ℂ)).re := by
+    simpa [Complex.add_re,Complex.mul_re] using hσ
+  rw [← twistLSeries_eq_logDeriv _ _ hs0, ← twistLSeries_eq_logDeriv _ _ hs1,
+    ← twistLSeries_eq_logDeriv _ _ hs2]
+  have h0 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt
+    (1 : DirichletCharacter ℂ q) hs0
+  have h1 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt χ hs1
+  have h2 := DirichletCharacter.LSeriesSummable_twist_vonMangoldt (χ^2) hs2
+  change Summable (LSeries.term (twistCoeff (1 : DirichletCharacter ℂ q)) (σ:ℂ)) at h0
+  change Summable (LSeries.term (twistCoeff χ) ((σ:ℂ)+Complex.I*(t:ℂ))) at h1
+  change Summable (LSeries.term (twistCoeff (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ))) at h2
+  unfold LSeries
+  rw [Complex.re_tsum h0,Complex.re_tsum h1,Complex.re_tsum h2,
+    ← tsum_mul_left, ← tsum_mul_left,
+    ← ((Complex.hasSum_re h0.hasSum).summable.mul_left 3).tsum_add
+      ((Complex.hasSum_re h1.hasSum).summable.mul_left 4),
+    ← (((Complex.hasSum_re h0.hasSum).summable.mul_left 3).add
+      ((Complex.hasSum_re h1.hasSum).summable.mul_left 4)).tsum_add
+      (Complex.hasSum_re h2.hasSum).summable]
+  exact tsum_nonneg (logDerivative_term_positive χ σ t)
+
+/-- Quantitative zero exclusion once the three local log-derivative
+    upper bounds are available. The error K is explicit, rather than an
+    existential asymptotic constant. -/
+theorem zero_free_gap_from_positive_combination
+    (β K A B C : ℝ) (hβ : β < 1) (hK : 0 < K)
+    (hpos : 0 ≤ 3*A+4*B+C)
+    (hA : A ≤ 16*K+K/8)
+    (hB : B ≤ -(1/(1+1/(16*K)-β))+K/8)
+    (hC : C ≤ K/8) :
+    β ≤ 1-1/(256*K) := by
+  have hden : 0 < 1+1/(16*K)-β := by positivity [sub_pos.mpr hβ]
+  have htotal : 4/(1+1/(16*K)-β) ≤ 49*K := by linarith
+  have hprod := (div_le_iff₀ hden).mp htotal
+  have hmul : (49*K)*(1+1/(16*K)-β) =
+      49*K*(1-β)+49/16 := by
+    field_simp [hK.ne']
+    <;> ring
+  rw [hmul] at hprod
+  have hlow : (1:ℝ)/256 ≤ K*(1-β) := by nlinarith only [hprod]
+  have h := (div_le_iff₀ hK).2 (show 1/256 ≤ (1-β)*K by
+    simpa [mul_comm] using hlow)
+  rw [div_div] at h
+  linarith
+
 end BmorScratch
