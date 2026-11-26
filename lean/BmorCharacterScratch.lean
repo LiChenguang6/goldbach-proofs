@@ -1239,12 +1239,13 @@ theorem perronKernel_global_bound (x c t : ℝ) (hx : 0 < x) (hc : 1 ≤ c) :
   rw [← div_eq_mul_inv]
   exact div_le_div_of_nonneg_left (Real.rpow_nonneg hx.le _) (by positivity) hm
 
+set_option maxHeartbeats 1000000 in
 theorem perronKernel_measurable (x c : ℝ) :
     Measurable (perronKernel x c) := by
+  have hz : Measurable (fun t : ℝ => (c:ℂ)+(t:ℂ)*Complex.I) := by fun_prop
+  have hp : Measurable (fun t : ℝ => (x:ℂ)^((c:ℂ)+(t:ℂ)*Complex.I)) := by fun_prop
   unfold perronKernel
-  apply Measurable.div
-  · fun_prop
-  · fun_prop
+  exact hp.div (hz.mul (hz.add measurable_const))
 
 theorem perronKernel_integrable (x c : ℝ) (hx : 0 < x) (hc : 1 ≤ c) :
     Integrable (perronKernel x c) := by
@@ -1318,6 +1319,7 @@ theorem perron_single_term (f : ℕ → ℂ) (x c : ℝ) (hx : 0 < x)
     rw [perronKernel, LSeries.term_of_ne_zero hk, Complex.ofReal_div,
       Complex.div_cpow_ofReal_nonneg hk'.le hx.le, Complex.cpow_neg, Complex.cpow_neg]
     push_cast
+    simp only [inv_inv]
     ring
   unfold mellinInv at hinv
   rw [show (∫ t : ℝ, perronKernel x c t *
@@ -1344,8 +1346,13 @@ theorem perron_integratedTwist {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ
   have hs : LSeriesSummable (twistCoeff χ) (c:ℂ) :=
     LSeriesSummable_of_sum_norm_bigO (twistCoeff_sum_norm_bigO χ) (by norm_num)
       (by simpa using hc)
-  simp_rw [← twistLSeries_eq_logDeriv χ _ (by
-    simp [Complex.add_re, Complex.mul_re]; linarith)]
+  have hL (t : ℝ) : -deriv (DirichletCharacter.LFunction χ) ((c:ℂ)+(t:ℂ)*Complex.I) /
+      DirichletCharacter.LFunction χ ((c:ℂ)+(t:ℂ)*Complex.I) =
+      LSeries (twistCoeff χ) ((c:ℂ)+(t:ℂ)*Complex.I) := by
+    symm
+    apply twistLSeries_eq_logDeriv
+    simpa [Complex.add_re, Complex.mul_re] using hc
+  simp_rw [hL]
   rw [perron_LSeries_interchange (twistCoeff χ) n c hn' hc.le hs]
   rw [mul_assoc, ← tsum_mul_left, ← tsum_mul_left]
   have hterm (k : ℕ) :
