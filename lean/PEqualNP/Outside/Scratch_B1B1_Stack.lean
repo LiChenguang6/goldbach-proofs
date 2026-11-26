@@ -6388,3 +6388,58 @@ theorem b1B1_tau1_atom_sum (n m : ℕ) :
   rfl
 
 end GoldbachB1B1Target
+
+namespace GoldbachB1B1Tool
+
+open Finset MeasureTheory Filter
+open DyadicMixedB4Geometric DyadicMixedB4GcdHarmonic
+
+/-- Scaled Young inequality `x · y ≤ ½ (scale·x² + scale⁻¹·y²)`, `scale > 0`. -/
+theorem scaled_young {s x y : ℝ} (sPositive : 0 < s) :
+    x * y ≤ (1 / 2) * (s * x ^ 2 + s⁻¹ * y ^ 2) := by
+  have multiplied : (2 * x * y - s * x ^ 2) * s ≤ y ^ 2 := by
+    nlinarith only [sq_nonneg (s * x - y)]
+  have divided := (le_div_iff₀ sPositive).mpr multiplied
+  rw [inv_mul_eq_div]
+  linarith only [divided]
+
+/-- C-S / Young indicator product bound:
+    `‖∫₀¹ s.indicator (f·g)‖ ≤ ½(scale·∫‖f‖² + scale⁻¹·∫‖g‖²)`.
+    Depends only on Mathlib integrability machinery; no band-position constants. -/
+theorem norm_indicator_product_le {f g : ℝ → ℂ} {s : Set ℝ} {scale : ℝ}
+    (scalePositive : 0 < scale) (sMeasurable : MeasurableSet s) (fMeasurable : Measurable f)
+    (gMeasurable : Measurable g)
+    (fSquareIntegrable : IntervalIntegrable (fun t => ‖f t‖ ^ 2) volume 0 1)
+    (gSquareIntegrable : IntervalIntegrable (fun t => ‖g t‖ ^ 2) volume 0 1) :
+    ‖∫ t in (0 : ℝ)..1, s.indicator (fun x => f x * g x) t‖ ≤
+      (1 / 2) * (scale * (∫ t in (0 : ℝ)..1, ‖f t‖ ^ 2) +
+        scale⁻¹ * (∫ t in (0 : ℝ)..1, ‖g t‖ ^ 2)) := by
+  let product := s.indicator (fun t => f t * g t)
+  let bound (t : ℝ) := (1 / 2) * (scale * ‖f t‖ ^ 2 + scale⁻¹ * ‖g t‖ ^ 2)
+  have productMeasurable : Measurable product := (fMeasurable.mul gMeasurable).indicator sMeasurable
+  have firstIntegrable : IntervalIntegrable (fun t => scale * ‖f t‖ ^ 2) volume 0 1 :=
+    fSquareIntegrable.const_mul scale
+  have secondIntegrable : IntervalIntegrable (fun t => scale⁻¹ * ‖g t‖ ^ 2) volume 0 1 :=
+    gSquareIntegrable.const_mul scale⁻¹
+  have sumIntegrable : IntervalIntegrable (fun t => scale * ‖f t‖ ^ 2 + scale⁻¹ * ‖g t‖ ^ 2) volume 0 1 :=
+    firstIntegrable.add secondIntegrable
+  have boundIntegrable : IntervalIntegrable bound volume 0 1 := sumIntegrable.const_mul (1 / 2)
+  have pointwise (t : ℝ) : ‖product t‖ ≤ bound t := by
+    unfold product bound
+    by_cases member : t ∈ s
+    · rw [Set.indicator_of_mem member, norm_mul]
+      exact scaled_young scalePositive
+    · rw [Set.indicator_of_notMem member, norm_zero]
+      positivity
+  have productIntegrable : IntervalIntegrable product volume 0 1 := boundIntegrable.mono_fun'
+    productMeasurable.aestronglyMeasurable (Filter.Eventually.of_forall pointwise)
+  calc
+    _ ≤ ∫ t in (0 : ℝ)..1, ‖product t‖ := intervalIntegral.norm_integral_le_integral_norm zero_le_one
+    _ ≤ ∫ t in (0 : ℝ)..1, bound t := intervalIntegral.integral_mono_on zero_le_one productIntegrable.norm
+      boundIntegrable (fun t _ => pointwise t)
+    _ = _ := by
+      unfold bound
+      rw [intervalIntegral.integral_const_mul, intervalIntegral.integral_add firstIntegrable secondIntegrable,
+        intervalIntegral.integral_const_mul, intervalIntegral.integral_const_mul]
+
+end GoldbachB1B1Tool
