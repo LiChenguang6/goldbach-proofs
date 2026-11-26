@@ -8492,7 +8492,7 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
         stepRange weightBound G D F energy
         (fun g hg => by have := (mem_Icc.mp hg).1; omega)
         (fun d hd => by have := (mem_Icc.mp hd).1; omega)
-        (fun f hf => by have ⟨_, hn0⟩ := Nat.mem_divisors.mp hf; omega)
+        (fun f hf => Nat.pos_of_mem_divisors hf)
         energyNonneg
       exact mul_le_mul_of_nonneg_left mainBound CNonnegative
     _ ≤ (40 * T ^ 2 * logBudget n) * ((W * logBudget n) *
