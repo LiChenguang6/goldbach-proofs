@@ -3307,7 +3307,7 @@ end BmorContourScratch
    than the original critical-line window estimate. -/
 namespace GoldbachProgression
 
-open Finset Filter Set MeasureTheory Complex Asymptotics DirichletCharacter
+open Finset Filter Set MeasureTheory Complex Asymptotics DirichletCharacter Metric MeromorphicOn
 open scoped BigOperators Classical Topology
 
 theorem rightHalf_window_multiplicity_le_of_circle_bound (f : ℂ → ℂ) (t M : ℝ) (Z : Finset ℂ)
@@ -3549,7 +3549,7 @@ end GoldbachProgression
 
 
 namespace GoldbachProgression
-open Finset Filter Set MeasureTheory Complex Asymptotics DirichletCharacter
+open Finset Filter Set MeasureTheory Complex Asymptotics DirichletCharacter Metric MeromorphicOn
 open scoped BigOperators Classical Topology
 
 theorem rightHalf_reciprocal_zero_sum_of_windows {q : ℕ} [NeZero q]
@@ -3707,5 +3707,92 @@ theorem rightHalf_unitPerronKernel_zero_sum {q : ℕ} [NeZero q]
         _ = _ := by ring
     _ = _ := (Finset.mul_sum ..).symm
     _ ≤ _ := mul_le_mul_of_nonneg_left H (Real.rpow_nonneg (by linarith) _)
+
+end GoldbachProgression
+
+
+namespace GoldbachProgression
+open Finset Filter Set MeasureTheory Complex DirichletCharacter Metric
+open scoped BigOperators Classical Topology
+
+/-- Construct a rectangle whose entire boundary avoids the actual
+    L-function zeros in the right half strip. The horizontal distances
+    have the explicit Jensen-based lower bound; the left side is chosen
+    from [1/2,3/4] using finiteness of the real projections.
+    This discharges the geometric existence hypotheses of the residue
+    formula without GRH. -/
+theorem rightHalf_exists_certified_rectangle {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (hprim : χ.IsPrimitive) (T : ℝ) (hT : 2 ≤ T) :
+    ∃ a u v : ℝ, ∃ Z : Finset ℂ,
+      (1/2 ≤ a ∧ a ≤ 3/4) ∧
+      (-T-1 ≤ u ∧ u ≤ -T) ∧ (T ≤ v ∧ v ≤ T+1) ∧
+      (∀ z : ℂ, z ∈ Z ↔ z ∈ Icc a 2 ×ℂ Icc u v ∧ z ≠ 1 ∧ χ.LFunction z = 0) ∧
+      (∀ z ∈ Z, a < z.re ∧ z.re < 2 ∧ u < z.im ∧ z.im < v) := by
+  classical
+  obtain ⟨u,hu,husep⟩ := rightHalf_primitive_good_height χ hprim (-T-1)
+  obtain ⟨v,hv,hvsep⟩ := rightHalf_primitive_good_height χ hprim T
+  have hu' : u ≤ -T := by linarith [hu.2]
+  let W := (finite_character_zeros_in_window χ 0 (T+1)).toFinset
+  let B := W.image (fun z : ℂ => 4*z.re)
+  obtain ⟨r,hr,hrsep⟩ := exists_height_avoiding B 2
+  let a := r/4
+  have ha : 1/2 ≤ a ∧ a ≤ 3/4 := by
+    dsimp [a]
+    constructor <;> linarith [hr.1,hr.2]
+  let Z := W.filter (fun z => a ≤ z.re ∧ u ≤ z.im ∧ z.im ≤ v)
+  have hW (z : ℂ) :
+      z ∈ W ↔ 0 < z.re ∧ z.re < 1 ∧ |z.im| ≤ T+1 ∧ χ.LFunction z = 0 := by
+    dsimp [W]
+    rw [(finite_character_zeros_in_window χ 0 (T+1)).mem_toFinset]
+    simp
+  have hZ (z : ℂ) : z ∈ Z ↔ z ∈ Icc a 2 ×ℂ Icc u v ∧ z ≠ 1 ∧ χ.LFunction z = 0 := by
+    constructor
+    · intro hz
+      obtain ⟨hw,hl,hi,hj⟩ := Finset.mem_filter.mp hz
+      obtain ⟨_,hre,_,hL⟩ := (hW z).mp hw
+      refine ⟨⟨⟨hl,by linarith⟩,⟨hi,hj⟩⟩,?_,hL⟩
+      intro h
+      simp [h] at hre
+    · intro hz
+      obtain ⟨⟨⟨hlo,hhi⟩,⟨hil,hih⟩⟩,hne,hL⟩ := hz
+      have hlt : z.re < 1 := by
+        by_contra! h
+        exact (χ.LFunction_ne_zero_of_one_le_re (.inr hne) h) hL
+      refine Finset.mem_filter.mpr ⟨(hW z).mpr
+        ⟨by linarith [ha.1],hlt,abs_le.mpr ⟨by linarith [hu.1],by linarith [hv.2]⟩,hL⟩,
+        hlo,hil,hih⟩
+  refine ⟨a,u,v,Z,ha,⟨hu.1,hu'⟩,hv,hZ,?_⟩
+  intro z hz
+  obtain ⟨hw,hl,hi,hj⟩ := Finset.mem_filter.mp hz
+  obtain ⟨_,hre,_,hL⟩ := (hW z).mp hw
+  have hzhalf : 1/2 ≤ z.re := ha.1.trans hl
+  have hleft : a < z.re := by
+    apply lt_of_le_of_ne hl
+    intro he
+    have hm : 4*z.re ∈ B := Finset.mem_image.mpr ⟨z,hw,rfl⟩
+    have hs := hrsep (4*z.re) hm
+    have hpos : 0 < (1:ℝ)/(3*((B.card:ℝ)+1)) := by positivity
+    have hz' : r-4*z.re = 0 := by dsimp [a] at he; linarith
+    rw [hz', abs_zero] at hs
+    linarith
+  have hq : (1:ℝ) ≤ q := by exact_mod_cast (Nat.pos_of_ne_zero (NeZero.ne q))
+  have hdenpos (t : ℝ) : 0 < (1:ℝ)/(3*((10 / Real.log (23/22)) *
+        Real.log ((q:ℝ)*(2+|t+1/2|)) + 1)) := by
+    have hlog : 0 ≤ Real.log ((q:ℝ)*(2+|t+1/2|)) :=
+      Real.log_nonneg (one_le_mul_of_one_le_of_one_le hq (by positivity))
+    positivity
+  have hbot : u < z.im := by
+    apply lt_of_le_of_ne hi
+    intro he
+    have hs := husep z hzhalf hre hL
+    rw [he,sub_self,abs_zero] at hs
+    exact (not_le_of_gt (hdenpos (-T-1))) hs
+  have htop : z.im < v := by
+    apply lt_of_le_of_ne hj
+    intro he
+    have hs := hvsep z hzhalf hre hL
+    rw [he,sub_self,abs_zero] at hs
+    exact (not_le_of_gt (hdenpos T)) hs
+  exact ⟨hleft,by linarith,hbot,htop⟩
 
 end GoldbachProgression
