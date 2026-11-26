@@ -883,4 +883,117 @@ theorem bmor_finite_cover (q a L U : ℕ) (hq : 1 ≤ q) (hL : 2 ≤ L)
   obtain ⟨hA, hlo, hhi⟩ := hcert p hp
   exact bmor_cell_certificate q a p.1 p.2 n hq hA hpn hnp hlo hhi
 
+
+/- Analytic bridge: the Mellin transform of the inclusive twisted
+   Chebyshev sum is the negative logarithmic derivative of L.
+   This section proves an identity in the half-plane of absolute
+   convergence, without assuming any explicit formula. -/
+open scoped Topology
+open Filter MeasureTheory Asymptotics
+
+noncomputable def twistCoeff {q : ℕ} (χ : DirichletCharacter ℂ q) (k : ℕ) : ℂ :=
+  χ (k : ZMod q) * (ArithmeticFunction.vonMangoldt k : ℂ)
+
+theorem twistCoeff_norm_le {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) (k : ℕ) :
+    ‖twistCoeff χ k‖ ≤ ArithmeticFunction.vonMangoldt k := by
+  rw [twistCoeff, norm_mul, Complex.norm_real, Real.norm_eq_abs,
+    abs_of_nonneg ArithmeticFunction.vonMangoldt_nonneg]
+  exact mul_le_of_le_one_left ArithmeticFunction.vonMangoldt_nonneg
+    (χ.norm_le_one (k : ZMod q))
+
+theorem twistCoeff_sum_norm_le {q : ℕ} [NeZero q]
+    (χ : DirichletCharacter ℂ q) (n : ℕ) :
+    (∑ k ∈ Finset.Icc 1 n, ‖twistCoeff χ k‖) ≤
+      (Real.log 4 + 4) * (n : ℝ) := by
+  calc
+    _ ≤ ∑ k ∈ Finset.Icc 1 n, ArithmeticFunction.vonMangoldt k :=
+      Finset.sum_le_sum (fun k _ => twistCoeff_norm_le χ k)
+    _ = Chebyshev.psi (n : ℝ) := by
+      simp [Chebyshev.psi, ← Finset.Icc_add_one_left_eq_Ioc]
+    _ ≤ _ := Chebyshev.psi_le_const_mul_self (by positivity)
+
+theorem twistCoeff_sum_norm_bigO {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q) :
+    (fun n : ℕ => ∑ k ∈ Finset.Icc 1 n, ‖twistCoeff χ k‖) =O[atTop]
+      (fun n : ℕ => (n : ℝ)^(1:ℝ)) := by
+  apply isBigO_of_le (Real.log 4 + 4)
+  intro n
+  rw [Real.norm_of_nonneg (Finset.sum_nonneg (fun _ _ => norm_nonneg _)),
+    Real.rpow_one, Real.norm_of_nonneg (by positivity : 0 ≤ (n:ℝ))]
+  exact twistCoeff_sum_norm_le χ n
+
+theorem psiTwist_eq_Icc {q : ℕ} (χ : DirichletCharacter ℂ q) (n : ℕ) :
+    psiTwist χ n = ∑ k ∈ Finset.Icc 1 n, twistCoeff χ k := by
+  classical
+  unfold psiTwist
+  change (∑ k ∈ Finset.range (n+1), twistCoeff χ k) = _
+  symm
+  apply Finset.sum_subset
+  · intro k hk
+    have h := Finset.mem_Icc.mp hk
+    exact Finset.mem_range.mpr (by omega)
+  · intro k hk hnot
+    have hr := Finset.mem_range.mp hk
+    have hz : k = 0 := by
+      by_contra hn
+      exact hnot (Finset.mem_Icc.mpr ⟨by omega, by omega⟩)
+    subst k
+    simp [twistCoeff]
+
+theorem twistLSeries_eq_logDeriv {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
+    (s : ℂ) (hs : 1 < s.re) :
+    LSeries (twistCoeff χ) s =
+      -deriv (DirichletCharacter.LFunction χ) s / DirichletCharacter.LFunction χ s := by
+  rw [χ.deriv_LFunction_eq_deriv_LSeries hs, χ.LFunction_eq_LSeries hs]
+  exact DirichletCharacter.LSeries_twist_vonMangoldt_eq χ hs
+
+theorem psiTwist_mellin_logDeriv {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
+    (s : ℂ) (hs : 1 < s.re) :
+    -deriv (DirichletCharacter.LFunction χ) s / DirichletCharacter.LFunction χ s =
+      s * ∫ t in Set.Ioi (1 : ℝ), psiTwist χ ⌊t⌋₊ * (t:ℂ)^(-(s+1)) := by
+  rw [← twistLSeries_eq_logDeriv χ s hs]
+  have h := LSeries_eq_mul_integral' (twistCoeff χ) (by norm_num : (0:ℝ) ≤ 1)
+    hs (twistCoeff_sum_norm_bigO χ)
+  simpa only [← psiTwist_eq_Icc] using h
+
+/-- The half-plane Re s ≥ 1 has no nontrivial L zeros, with the principal
+    character's point s=1 excluded. This does not assert a quantitative
+    zero-free strip to the left of Re s=1. -/
+theorem zero_re_lt_one {q : ℕ} [NeZero q] (χ : DirichletCharacter ℂ q)
+    (s : ℂ) (hz : DirichletCharacter.LFunction χ s = 0)
+    (he : χ ≠ 1 ∨ s ≠ 1) : s.re < 1 := by
+  by_contra! hs
+  exact (χ.LFunction_ne_zero_of_one_le_re he hs) hz
+
+/- Kernel estimates for a smoothed Perron inversion. They give uniform
+   absolute decay on a vertical integration line. -/
+noncomputable def perronKernel (x c t : ℝ) : ℂ :=
+  (x:ℂ)^((c:ℂ)+(t:ℂ)*Complex.I) /
+    (((c:ℂ)+(t:ℂ)*Complex.I)*((c:ℂ)+(t:ℂ)*Complex.I+1))
+
+theorem perronKernel_norm (x c t : ℝ) (hx : 0 < x) :
+    ‖perronKernel x c t‖ =
+      x^c / (Real.sqrt (c^2+t^2) * Real.sqrt ((c+1)^2+t^2)) := by
+  rw [perronKernel, norm_div, norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos hx]
+  simp only [Complex.add_re, Complex.add_im, Complex.ofReal_re, Complex.ofReal_im,
+    Complex.mul_re, Complex.mul_im, Complex.I_re, Complex.I_im, Complex.one_re,
+    Complex.one_im, mul_zero, mul_one, zero_mul, zero_add, add_zero, sub_zero]
+  congr 1
+  · rw [Complex.norm_def, Complex.norm_def]
+    simp [Complex.normSq_apply]
+    congr 2 <;> ring
+
+theorem perronKernel_norm_le (x c t : ℝ) (hx : 0 < x) (ht : 0 < |t|) :
+    ‖perronKernel x c t‖ ≤ x^c / t^2 := by
+  rw [perronKernel_norm x c t hx]
+  have h1 : |t| ≤ Real.sqrt (c^2+t^2) := by
+    rw [← Real.sqrt_sq_eq_abs]
+    exact Real.sqrt_le_sqrt (by nlinarith [sq_nonneg c])
+  have h2 : |t| ≤ Real.sqrt ((c+1)^2+t^2) := by
+    rw [← Real.sqrt_sq_eq_abs]
+    exact Real.sqrt_le_sqrt (by nlinarith [sq_nonneg (c+1)])
+  have hden := mul_le_mul h1 h2 (abs_nonneg t) (Real.sqrt_nonneg _)
+  rw [← sq, sq_abs] at hden
+  exact div_le_div_of_nonneg_left (Real.rpow_nonneg hx.le _)
+    (by positivity) hden
+
 end BmorScratch
