@@ -300,7 +300,8 @@ theorem inverseSquare_integral (a b : ℝ) (ha : 0 < a) (hab : a ≤ b) :
     exact fun h => (not_le_of_gt ha) h.1
   have h := integral_zpow (a := a) (b := b) (n := -2)
     (Or.inr ⟨by decide, hzero⟩)
-  simpa [zpow_neg, one_div, neg_sub] using h
+  norm_num [zpow_neg, one_div, neg_sub] at h ⊢
+  linarith only [h]
 
 theorem inverseSquare_step_integral (a b h : ℝ) (ha : 0 < a)
     (hah : a ≤ h) (hhb : h ≤ b) :
@@ -408,7 +409,7 @@ theorem criticalLine_band_bound {ι : Type*} (s : Finset ι) (ρ : ι → ℂ)
     (hi : ∀ i ∈ s, 0 < |(ρ i).im|) :
     ‖∑ i ∈ s, (x : ℂ)^(ρ i) / ρ i‖ ≤
       Real.sqrt x * ∑ i ∈ s, 1/|(ρ i).im| := by
-  rw [← Real.rpow_one_half]
+  rw [Real.sqrt_eq_rpow]
   exact zeroBand_norm_bound s ρ x (1/2) hx (fun i h => (hre i h).le) hi
 
 /-- For a real-part gap δ, isolate the exponential decay factor. -/
@@ -488,7 +489,9 @@ theorem changeLevel_twist_difference {d q : ℕ} (hd : d ∣ q)
   apply Finset.sum_congr rfl
   intro k hk
   rw [changeLevel_apply_nat hd χ k]
-  by_cases hc : Nat.Coprime k q <;> simp [hc]
+  by_cases hc : Nat.Coprime k q
+  · simp only [hc, ite_true, not_true_eq_false, ite_false, sub_self]
+  · simp only [hc, ite_false, not_false_eq_true, ite_true, zero_mul, sub_zero]
 
 theorem changeLevel_twist_bound {d q : ℕ} [NeZero d] (hd : d ∣ q)
     (χ : DirichletCharacter ℂ d) (n : ℕ) :
