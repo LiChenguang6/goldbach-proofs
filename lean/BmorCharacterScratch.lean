@@ -685,4 +685,134 @@ theorem bmor_of_primitive_budget
       add_le_add_right hH _
     _ = _ := by rw [hD']; ring
 
+
+/- BMOR Lemma 2.18, integration of the logarithmic zero-count envelope.
+   A finite-interval estimate is sufficient for any truncated zero sum;
+   it is uniform in the upper endpoint. -/
+noncomputable def logPowerTailPrimitive (d m t : ℝ) : ℝ :=
+  -(Real.log (d*t)/m + 1/m^2) * Real.exp (-m*Real.log t)
+
+theorem logPowerTailPrimitive_hasDerivAt (d m t : ℝ) (hd : 0<d)
+    (hm : 0<m) (ht : 0<t) :
+    HasDerivAt (logPowerTailPrimitive d m)
+      (Real.log (d*t)*Real.exp (-m*Real.log t)/t) t := by
+  have hdt : HasDerivAt (fun z : ℝ => d*z) d t := by
+    simpa using (hasDerivAt_id t).const_mul d
+  have hL := (hdt.log (mul_ne_zero hd.ne' ht.ne')).div_const m
+  have hR := ((Real.hasDerivAt_log ht.ne').const_mul (-m)).exp
+  have h := (hL.add_const (1/m^2)).neg.mul hR
+  unfold logPowerTailPrimitive
+  convert h using 1
+  · funext z
+    rfl
+  · simp only [id_eq]
+    field_simp [hd.ne', hm.ne', ht.ne']
+    <;> ring
+
+theorem logPowerTailIntegral (d m a b : ℝ) (hd : 0<d) (hm : 0<m)
+    (ha : 0<a) (hab : a≤b) :
+    (∫ t in a..b, Real.log (d*t)*Real.exp (-m*Real.log t)/t) =
+      logPowerTailPrimitive d m b - logPowerTailPrimitive d m a := by
+  have hc : ContinuousOn
+      (fun t : ℝ => Real.log (d*t)*Real.exp (-m*Real.log t)/t)
+      (Set.uIcc a b) := by
+    intro t ht
+    rw [Set.uIcc_of_le hab] at ht
+    have hp : 0<t := ha.trans_le ht.1
+    apply ContinuousAt.continuousWithinAt
+    fun_prop (disch := positivity)
+  apply intervalIntegral.integral_eq_sub_of_hasDerivAt _ hc.intervalIntegrable
+  intro t ht
+  rw [Set.uIcc_of_le hab] at ht
+  exact logPowerTailPrimitive_hasDerivAt d m t hd hm (ha.trans_le ht.1)
+
+theorem logPowerTailPrimitive_nonpos (d m t : ℝ) (hd : 1≤d) (hm : 0<m)
+    (ht : 1≤t) : logPowerTailPrimitive d m t ≤ 0 := by
+  have hprod : 1≤d*t := by nlinarith [mul_nonneg (sub_nonneg.mpr hd) (sub_nonneg.mpr ht)]
+  have hlog := Real.log_nonneg hprod
+  unfold logPowerTailPrimitive
+  exact mul_nonpos_of_nonpos_of_nonneg (by positivity) (Real.exp_pos _).le
+
+theorem logPowerTailIntegral_bound (d m a b : ℝ) (hd : 1≤d) (hm : 0<m)
+    (ha : 1≤a) (hab : a≤b) :
+    (∫ t in a..b, Real.log (d*t)*Real.exp (-m*Real.log t)/t) ≤
+      (Real.log (d*a)/m+1/m^2)*Real.exp (-m*Real.log a) := by
+  rw [logPowerTailIntegral d m a b (by linarith) hm (by linarith) hab]
+  have h := logPowerTailPrimitive_nonpos d m b hd hm (ha.trans hab)
+  unfold logPowerTailPrimitive
+  unfold logPowerTailPrimitive at h
+  linarith only [h]
+
+theorem logPowerIntegrand_eq (d m t : ℝ) (ht : 0<t) :
+    Real.log (d*t)*Real.exp (-m*Real.log t)/t =
+      Real.log (d*t)/t^(m+1) := by
+  rw [Real.rpow_def_of_pos ht, ← Real.exp_log ht]
+  -- Use exponential addition and inverse laws; no asymptotic assumptions.
+  rw [show Real.log (Real.exp (Real.log t)) = Real.log t by rw [Real.log_exp]]
+  rw [show Real.log t*(m+1) = Real.log t + m*Real.log t by ring, Real.exp_add]
+  rw [show -m*Real.log t = -(m*Real.log t) by ring, Real.exp_neg]
+  field_simp
+  <;> ring
+
+/- Appendix A.6: endpoint certificates on a finite range.  Monotonicity
+   lets two rationally certified endpoint enclosures cover the entire cell.
+   No actual large-range prime-count certificate is asserted here. -/
+theorem psiAP_mono (q a : ℕ) : Monotone (psiAP q a) := by
+  intro n m hnm
+  unfold psiAP
+  apply Finset.sum_le_sum_of_subset_of_nonneg
+  · intro k hk
+    obtain ⟨hr, hmod⟩ := Finset.mem_filter.mp hk
+    exact Finset.mem_filter.mpr ⟨Finset.mem_range.mpr
+      (by have := Finset.mem_range.mp hr; omega), hmod⟩
+  · intro k hk hnot
+    exact ArithmeticFunction.vonMangoldt_nonneg
+
+theorem bmor_cell_certificate (q a A B n : ℕ) (hq : 1≤q) (hA : 2≤A)
+    (hAn : A≤n) (hnB : n≤B)
+    (hlo : (B:ℝ)/(q.totient:ℝ) - psiAP q a A ≤
+      (A:ℝ)/(840*Real.log (B:ℝ)))
+    (hhi : psiAP q a B - (A:ℝ)/(q.totient:ℝ) ≤
+      (A:ℝ)/(840*Real.log (B:ℝ))) :
+    |psiAP q a n - (n:ℝ)/(q.totient:ℝ)| ≤
+      (n:ℝ)/(840*Real.log (n:ℝ)) := by
+  have hA' : (2:ℝ)≤(A:ℝ) := by exact_mod_cast hA
+  have hAn' : (A:ℝ)≤(n:ℝ) := by exact_mod_cast hAn
+  have hnB' : (n:ℝ)≤(B:ℝ) := by exact_mod_cast hnB
+  have hln : 0<Real.log (n:ℝ) := Real.log_pos (by linarith)
+  have hlB : Real.log (n:ℝ)≤Real.log (B:ℝ) :=
+    Real.log_le_log (by linarith) hnB'
+  have hp := Nat.totient_pos.mpr (by omega : 0<q)
+  have hp' : (0:ℝ) < q.totient := by exact_mod_cast hp
+  have hl := psiAP_mono q a hAn
+  have hh := psiAP_mono q a hnB
+  have hmainl := div_le_div_of_nonneg_right hAn' hp'.le
+  have hmainh := div_le_div_of_nonneg_right hnB' hp'.le
+  have hb : (A:ℝ)/(840*Real.log (B:ℝ)) ≤ (n:ℝ)/(840*Real.log (n:ℝ)) := by
+    calc
+      _ ≤ (A:ℝ)/(840*Real.log (n:ℝ)) :=
+        div_le_div_of_nonneg_left (by positivity) (by positivity)
+          (mul_le_mul_of_nonneg_left hlB (by norm_num))
+      _ ≤ _ := div_le_div_of_nonneg_right hAn' (by positivity)
+  apply abs_le.mpr
+  constructor <;> linarith only [hl, hh, hmainl, hmainh, hlo, hhi, hb]
+
+/-- Use kernel-checked cells to certify every integer in a finite interval. -/
+theorem bmor_finite_cover (q a L U : ℕ) (hq : 1≤q) (hL : 2≤L)
+    (cells : Finset (ℕ×ℕ))
+    (hcover : ∀ n : ℕ, L≤n → n≤U →
+      ∃ p ∈ cells, p.1≤n ∧ n≤p.2)
+    (hcert : ∀ p ∈ cells, 2≤p.1 ∧
+      (p.2:ℝ)/(q.totient:ℝ)-psiAP q a p.1 ≤
+        (p.1:ℝ)/(840*Real.log (p.2:ℝ)) ∧
+      psiAP q a p.2-(p.1:ℝ)/(q.totient:ℝ) ≤
+        (p.1:ℝ)/(840*Real.log (p.2:ℝ))) :
+    ∀ n : ℕ, L≤n → n≤U →
+      |psiAP q a n - (n:ℝ)/(q.totient:ℝ)| ≤
+        (n:ℝ)/(840*Real.log (n:ℝ)) := by
+  intro n hn hU
+  obtain ⟨p, hp, hpn, hnp⟩ := hcover n hn hU
+  obtain ⟨hA, hlo, hhi⟩ := hcert p hp
+  exact bmor_cell_certificate q a p.1 p.2 n hq hA hpn hnp hlo hhi
+
 end BmorScratch
