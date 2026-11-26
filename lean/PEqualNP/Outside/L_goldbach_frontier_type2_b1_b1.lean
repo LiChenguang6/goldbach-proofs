@@ -8736,13 +8736,16 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
       mul_le_mul_of_nonneg_left Fbound SPos.le
     exact e1a.trans <| mul_le_mul_of_nonneg_left
       (mul_le_mul_of_nonneg_right hA2 (by positivity)) SPos.le
+  have hWb : W ^ 2 * bracket ≤ W' ^ 2 * bracket :=
+    mul_le_mul_of_nonneg_left hW2 hb
+  have hW128 : 128 * W ^ 2 * bracket ≤ 128 * W' ^ 2 * bracket :=
+    mul_le_mul_of_nonneg_left hWb (by positivity)
   have e2 : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
       (b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket) := by
     have e2a : (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2 ≤
         (b1B1_outsideScale n)⁻¹ * (128 * W ^ 2 * bracket) :=
       mul_le_mul_of_nonneg_left Gbound (inv_nonneg.mpr SPos.le)
-    exact e2a.trans <| mul_le_mul_of_nonneg_left
-      (mul_le_mul_of_nonneg_left hW2 hb) (by positivity)
+    exact e2a.trans <| mul_le_mul_of_nonneg_left hW128 (by positivity)
   have main : (1 / 2 : ℝ) *
       ((b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) +
         ((b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2)) ≤
@@ -8750,11 +8753,11 @@ theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
     have conc := b1B1_outside_budget_le hn TLower
     calc
       (1 / 2 : ℝ) *
-        (b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2 +
-          (b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2)
+        ((b1B1_outsideScale n * ∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) +
+          ((b1B1_outsideScale n)⁻¹ * ∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2))
         ≤ (1 / 2 : ℝ) *
-            (b1B1_outsideScale n * (((n : ℝ) + 1) * A' ^ 2) +
-              (b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket)) :=
+            ((b1B1_outsideScale n * (((n : ℝ) + 1) * A' ^ 2)) +
+              ((b1B1_outsideScale n)⁻¹ * (128 * W' ^ 2 * bracket))) :=
           mul_le_mul_of_nonneg_left (add_le_add e1 e2) (by norm_num)
       _ ≤ 577 * finalScale n T := conc
   exact productBound.trans main
