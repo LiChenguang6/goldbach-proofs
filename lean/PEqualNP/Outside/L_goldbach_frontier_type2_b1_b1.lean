@@ -7212,3 +7212,123 @@ theorem shiftedPolynomial_parseval (n : ℕ) (a : ℕ → ℂ) :
   exact parseval_real (n + 1) a
 
 end GoldbachB1B1Polynomial
+
+namespace GoldbachB1B1LowAtoms
+
+open Finset Filter ArithmeticFunction
+open GoldbachB1B1 GoldbachB1B1Target GoldbachB1B1Adapt GoldbachB1B1Scale
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry DyadicMixedB4EnergyTail
+
+/-- Low×low atom set: `p=(a,b)` with `a ∈ (U n, B₁ n]`, `b ∈ (U n, n/a]`. -/
+def lowAtomSet (n : ℕ) : Finset (ℕ × ℕ) :=
+  ((Ioc (U n) (B₁ n)).product (range (n + 1))).filter
+    (fun p => U n < p.2 ∧ p.1 * p.2 ≤ n)
+
+/-- Atom step: the small divisor `a` (the product `a·b` stays in the mode layer). -/
+def lowAtomStep (_n : ℕ) (p : ℕ × ℕ) : ℕ := p.1
+
+/-- Atom window indices: single cell `Ioc (b-1, b) = {b}`. -/
+def lowAtomLower (p : ℕ × ℕ) : ℕ := p.2 - 1
+def lowAtomUpper (p : ℕ × ℕ) : ℕ := p.2
+
+/-- Atom weight, termwise identical to the `τ₁ n m` summand for `m = a·b`. -/
+def lowAtomWeight (n : ℕ) (p : ℕ × ℕ) : ℂ :=
+  (∑ d ∈ (Nat.divisors p.1).filter (fun d => U n < d), μ d : ℂ) *
+    (vonMangoldt p.2 : ℂ)
+
+/-- G: offWave expansion of the same low band over the atom set. -/
+def lowOutsidePolynomial (n : ℕ) (t : ℝ) : ℂ :=
+  ∑ p ∈ lowAtomSet n, lowAtomWeight n p *
+    offWave (radius (BM n)) p.1 (p.2 - 1) p.2 t
+
+theorem mem_lowAtomSet {n : ℕ} {p : ℕ × ℕ} :
+    p ∈ lowAtomSet n ↔
+      U n < p.1 ∧ p.1 ≤ B₁ n ∧ U n < p.2 ∧ p.1 * p.2 ≤ n := by
+  constructor
+  · intro h
+    have hmem := mem_product.mp (mem_filter.mp h).1
+    have hcond := (mem_filter.mp h).2
+    obtain ⟨h1, h2⟩ := mem_Ioc.mp hmem.1
+    exact ⟨h1, h2, hcond.1, hcond.2⟩
+  · rintro ⟨h1, h2, h3, h4⟩
+    have h1pos : 1 ≤ p.1 := by omega
+    have h5 : p.2 ≤ n := (Nat.le_mul_of_pos_left p.2 h1pos).trans h4
+    refine mem_filter.mpr ⟨mem_product.mpr ⟨mem_Ioc.mpr ⟨h1, h2⟩, mem_range.mpr (by omega)⟩,
+      ⟨h3, h4⟩⟩
+
+/-- Fibre of atoms with `a·b = m`. -/
+def tau1AtomFibre (n m : ℕ) : Finset (ℕ × ℕ) :=
+  (lowAtomSet n).filter (fun p => p.1 * p.2 = m)
+
+/-- Interface alignment: `τ₁ n m` equals the atom-weight sum over the fibre `a·b = m`. -/
+theorem tau1_atom_sum (n m : ℕ) (hm : m ≤ n) :
+    (τ₁ n m : ℂ) =
+      ∑ p ∈ lowAtomSet n, if p.1 * p.2 = m then lowAtomWeight n p else 0 := by
+  by_cases hM : m = 0
+  · subst hM
+    have hR : (∑ p ∈ lowAtomSet n, if p.1 * p.2 = 0 then lowAtomWeight n p else (0 : ℂ)) = 0 := by
+      rw [← sum_filter]
+      apply sum_eq_zero
+      intro p hp
+      have hmem := mem_lowAtomSet.mp (mem_filter.mp hp).1
+      have h1pos : 0 < p.1 := by omega
+      have h2pos : 0 < p.2 := by omega
+      have hnz : p.1 * p.2 ≠ 0 := mul_ne_zero h1pos.ne' h2pos.ne'
+      exact False.elim (hnz (mem_filter.mp hp).2)
+    have hL : (τ₁ n 0 : ℂ) = 0 := by
+      rw [b1B1_tau1_atom_sum]
+      simp
+    rw [hL, hR]
+  · have mPos : 0 < m := Nat.pos_of_ne_zero hM
+    let S := (Nat.divisors m).filter (fun a => U n < a ∧ a ≤ B₁ n ∧ U n < m / a)
+    let T := tau1AtomFibre n m
+    have hbij : ∑ a ∈ S, ((∑ d ∈ (Nat.divisors a).filter (fun d => U n < d), μ d : ℂ) *
+        (vonMangoldt (m / a) : ℂ)) = ∑ p ∈ T, lowAtomWeight n p := by
+      apply Finset.sum_bij (s := S) (t := T) (fun a _ => (a, m / a))
+      · intro a ha
+        have hmem := mem_filter.mp ha
+        have hdiv := hmem.1
+        have hcond := hmem.2
+        have hU := hcond.1
+        have hB := hcond.2.1
+        have hC := hcond.2.2
+        have hmul : a * (m / a) = m := Nat.mul_div_cancel' (Nat.dvd_of_mem_divisors hdiv)
+        have hAtom : (a, m / a) ∈ lowAtomSet n := by
+          rw [mem_lowAtomSet]
+          exact ⟨hU, hB, hC, by rw [hmul]; exact hm⟩
+        exact mem_filter.mpr ⟨hAtom, hmul⟩
+      · intro a _ a' _ h
+        simp only [Prod.ext_iff] at h
+        exact h.1
+      · intro p hp
+        have hpatom := (mem_filter.mp hp).1
+        have heq : p.1 * p.2 = m := (mem_filter.mp hp).2
+        obtain ⟨hU, hB, hC, _⟩ := mem_lowAtomSet.mp hpatom
+        set a := p.1
+        set b := p.2
+        have haDiv : a ∣ m := ⟨b, heq.symm⟩
+        have haPos : 0 < a := by omega
+        have haMemDiv : a ∈ Nat.divisors m := Nat.mem_divisors.mpr ⟨haDiv, hM⟩
+        have hb : m / a = b := Nat.div_eq_of_eq_mul_right haPos heq.symm
+        have haInS : a ∈ S :=
+          mem_filter.mpr ⟨haMemDiv, hU, hB, by rw [hb]; exact hC⟩
+        have hfa : (a, m / a) = p := by
+          apply Prod.ext
+          · rfl
+          · exact hb
+        exact ⟨a, haInS, hfa⟩
+      · intro a _
+        rfl
+    have htau : (τ₁ n m : ℂ) = ∑ a ∈ S, ((∑ d ∈ (Nat.divisors a).filter (fun d => U n < d), μ d : ℂ) *
+        (vonMangoldt (m / a) : ℂ)) := by
+      have h : τ₁ n m = ∑ a ∈ S,
+          (∑ d ∈ (Nat.divisors a).filter (fun d => U n < d), μ d) * vonMangoldt (m / a) :=
+        b1B1_tau1_atom_sum n m
+      exact_mod_cast h
+    calc
+      (τ₁ n m : ℂ) = ∑ a ∈ S, _ := htau
+      _ = ∑ p ∈ T, lowAtomWeight n p := hbij
+      _ = ∑ p ∈ lowAtomSet n, if p.1 * p.2 = m then lowAtomWeight n p else 0 :=
+        sum_filter (s := lowAtomSet n) (p := fun p => p.1 * p.2 = m) (f := lowAtomWeight n)
+
+end GoldbachB1B1LowAtoms
