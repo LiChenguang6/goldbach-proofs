@@ -7891,7 +7891,22 @@ theorem b1B1_one_sided_second_moment_le (n x : ℕ) (hn : 2 ≤ n) (hx : x ≤ n
     {T : ℝ} (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
     (∑ m ∈ range (x + 1), |τ₁ n m| ^ 2 : ℝ) ≤
       ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 := by
-  sorry
+  have nPositive : 0 < n := by omega
+  have hPoint : ∀ m ∈ range (x + 1), |τ₁ n m| ^ 2 ≤ T ^ 4 * logBudget n ^ 2 := by
+    intro m hm
+    have mBound : m ≤ n := (Finset.mem_range.mp hm).trans hx
+    have hInf : |τ₁ n m| ≤ T ^ 2 * logBudget n :=
+      b1B1_tau1_inf_le n m mBound nPositive divisorBound
+    have hSq : |τ₁ n m| ^ 2 ≤ (T ^ 2 * logBudget n) ^ 2 :=
+      pow_le_pow_left₀ (abs_nonneg _) hInf 2
+    have hEq : (T ^ 2 * logBudget n) ^ 2 = T ^ 4 * logBudget n ^ 2 := by ring
+    rw [hEq] at hSq
+    exact hSq
+  have hSum : ∑ m ∈ range (x + 1), |τ₁ n m| ^ 2 ≤
+      ∑ m ∈ range (x + 1), T ^ 4 * logBudget n ^ 2 :=
+    Finset.sum_le_sum hPoint
+  rw [hSum, Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+  ring
 
 -- ===========================================================================
 -- 4. Unbalanced tail C-S closure (the only new estimate; sorry at the envelope)
