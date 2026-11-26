@@ -50,3 +50,8 @@ jobs:
         if: always()
         working-directory: lean
         run: lake env lean BmorCharacterScratch.lean
+
+      - name: Check GRH-free finite-rectangle bridge
+        if: always()
+        working-directory: lean
+        run: lake env lean BmorContourScratch.lean
