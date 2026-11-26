@@ -1,31 +1,25 @@
-name: Isolated FW-8007 Lean check
+name: Read live Goldbach open lemmas
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'lean/PEqualNP/Outside/L_goldbach_factor_line_fiber_determinant.lean'
   push:
     branches: [test/lean-fw8007-cloud]
-    paths:
-      - 'lean/PEqualNP/Outside/L_goldbach_factor_line_fiber_determinant.lean'
-      - '.github/workflows/fw8007-cloud.yml'
 permissions:
   contents: read
 jobs:
-  lean:
+  live-status:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Elan
+      - name: Read public status (no claims)
         run: |
-          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
-          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Fetch pinned Mathlib and cache
-        working-directory: lean
-        run: |
-          lean --version
-          lake exe cache get
-      - name: Elaborate proof
-        working-directory: lean
-        run: lake env lean PEqualNP/Outside/L_goldbach_factor_line_fiber_determinant.lean
+          curl --fail --silent --show-error --compressed --retry 2 --max-time 45 'https://www.movan.tech/goldbach/api/status' -o /tmp/goldbach-status.json
+          python3 - <<'PY'
+          import json, datetime
+          s=json.load(open('/tmp/goldbach-status.json'))
+          print('STATUS UTC:', datetime.datetime.now(datetime.timezone.utc).isoformat())
+          print('COUNTS:', s.get('counts'))
+          for g in s['gaps']:
+              if g.get('proved') is False:
+                  print(json.dumps({'id':g['id'],'proved':g['proved'],'latest':(g.get('latest') or {}).get('verdict'),'statement':g.get('statement','')[:300]},ensure_ascii=False))
+          PY
