@@ -7165,3 +7165,50 @@ theorem b1B1_outside_budget_le {n : ℕ} (hn : 1 ≤ n) {T : ℝ} (TLower : 1 �
     _ = 577 * finalScale n T := by unfold finalScale; ring
 
 end GoldbachB1B1Budget
+
+namespace GoldbachB1B1Polynomial
+
+open Finset Filter
+open DyadicMixedB4Fourier DyadicMixedB4Geometric DyadicMixedB4ArcCenters
+
+/-- Plain trigonometric polynomial `Σ_{m≤n} a_m · phase(m t)`. -/
+def plainPolynomial (n : ℕ) (a : ℕ → ℂ) (t : ℝ) : ℂ :=
+  ∑ m ∈ range (n + 1), a m * phase ((m : ℝ) * t)
+
+/-- Shifted polynomial `Σ_{m≤n} a_m · phase((m-n) t)`. -/
+def shiftedPolynomial (n : ℕ) (a : ℕ → ℂ) (t : ℝ) : ℂ :=
+  ∑ m ∈ range (n + 1), a m * phase ((((m : ℤ) - (n : ℤ) : ℤ) : ℝ) * t)
+
+theorem shiftedPolynomial_eq (n : ℕ) (a : ℕ → ℂ) (t : ℝ) :
+    shiftedPolynomial n a t = plainPolynomial n a t * phase (-(n : ℝ) * t) := by
+  rw [shiftedPolynomial, plainPolynomial, sum_mul]
+  refine sum_congr rfl fun m _ => ?_
+  have h : (((m : ℤ) - (n : ℤ) : ℤ) : ℝ) * t = (m : ℝ) * t + (-(n : ℝ) * t) := by
+    push_cast; ring
+  have key : phase ((((m : ℤ) - (n : ℤ) : ℤ) : ℝ) * t) =
+      phase ((m : ℝ) * t) * phase (-(n : ℝ) * t) := by
+    rw [h]
+    exact phase_add ((m : ℝ) * t) (-(n : ℝ) * t)
+  rw [key]
+  ring
+
+theorem shiftedPolynomial_continuous (n : ℕ) (a : ℕ → ℂ) :
+    Continuous (shiftedPolynomial n a) := by
+  unfold shiftedPolynomial phase
+  fun_prop
+
+theorem norm_shiftedPolynomial_eq (n : ℕ) (a : ℕ → ℂ) (t : ℝ) :
+    ‖shiftedPolynomial n a t‖ = ‖plainPolynomial n a t‖ := by
+  rw [shiftedPolynomial_eq, norm_mul, norm_phase', mul_one]
+
+theorem shiftedPolynomial_parseval (n : ℕ) (a : ℕ → ℂ) :
+    (∫ t in (0 : ℝ)..1, ‖shiftedPolynomial n a t‖ ^ 2) =
+      ∑ m ∈ range (n + 1), ‖a m‖ ^ 2 := by
+  have exactMode (m : ℕ) (t : ℝ) : phase ((m : ℝ) * t) = mode (m : ℤ) t := by
+    rw [BombieriVinogradov.LargeSieve.mode_nat_additivePhase]
+    simp only [phase, BombieriVinogradov.LargeSieve.additivePhase, circleMap_zero,
+      Complex.ofReal_one, one_mul]
+  simp only [norm_shiftedPolynomial_eq, plainPolynomial, exactMode]
+  exact parseval_real (n + 1) a
+
+end GoldbachB1B1Polynomial
