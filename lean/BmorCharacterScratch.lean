@@ -1648,7 +1648,7 @@ theorem logDerivative_term_positive {q : ℕ} [NeZero q]
 theorem logDerivative_positive_combination {q : ℕ} [NeZero q]
     (χ : DirichletCharacter ℂ q) (σ t : ℝ) (hσ : 1 < σ) :
     0 ≤ 3 * (-deriv (DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q))
-          (σ:ℂ) / DirichletCharacter.LFunction 1 (σ:ℂ)).re +
+          (σ:ℂ) / DirichletCharacter.LFunction (1 : DirichletCharacter ℂ q) (σ:ℂ)).re +
       4 * (-deriv (DirichletCharacter.LFunction χ) ((σ:ℂ)+Complex.I*(t:ℂ)) /
           DirichletCharacter.LFunction χ ((σ:ℂ)+Complex.I*(t:ℂ))).re +
       (-deriv (DirichletCharacter.LFunction (χ^2)) ((σ:ℂ)+2*Complex.I*(t:ℂ)) /
@@ -1689,7 +1689,9 @@ theorem zero_free_gap_from_positive_combination
     β ≤ 1-1/(256*K) := by
   have hstep : 0 < 1/(16*K) := by positivity
   have hden : 0 < 1+1/(16*K)-β := by linarith only [hstep, hβ]
-  have htotal : 4/(1+1/(16*K)-β) ≤ 49*K := by linarith
+  have htotal' : 4 * (1/(1+1/(16*K)-β)) ≤ 49*K := by linarith only [hpos,hA,hB,hC]
+  have htotal : 4/(1+1/(16*K)-β) ≤ 49*K := by
+    simpa only [mul_one_div] using htotal'
   have hprod := (div_le_iff₀ hden).mp htotal
   have hmul : (49*K)*(1+1/(16*K)-β) =
       49*K*(1-β)+49/16 := by
@@ -1700,6 +1702,6 @@ theorem zero_free_gap_from_positive_combination
   have h := (div_le_iff₀ hK).2 (show 1/256 ≤ (1-β)*K by
     simpa [mul_comm] using hlow)
   rw [div_div] at h
-  linarith
+  linarith only [h]
 
 end BmorScratch
