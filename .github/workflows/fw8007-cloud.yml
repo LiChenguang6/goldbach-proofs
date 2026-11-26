@@ -27,7 +27,12 @@ jobs:
                   for v in x.values(): visit(v)
               elif isinstance(x, list):
                   for v in x: visit(v)
-          visit(json.load(open("/tmp/goldbach-status.json")))
+          status = json.load(open("/tmp/goldbach-status.json"))
+          visit(status)
+          print("OPEN_COUNTS", status.get("counts"))
+          for g in status.get("gaps", []):
+              if g.get("proved") is False:
+                  print("OPEN_GAP", g["id"], (g.get("latest") or {}).get("verdict"))
           PY
       - name: Install Elan
         run: |
