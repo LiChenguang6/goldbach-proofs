@@ -5,6 +5,7 @@ import Mathlib.NumberTheory.DirichletCharacter.Orthogonality
 import Mathlib.NumberTheory.Harmonic.Bounds
 import Mathlib.NumberTheory.LSeries.Nonvanishing
 import Mathlib.Tactic
+set_option maxHeartbeats 1000000
 
 /-!
 The high band has an expansion in short-step geometric sums.
@@ -7760,3 +7761,1184 @@ theorem b1B1_deepPair_split_aux {ι : Type*} (n M B H R : ℕ)
 end
 
 end GoldbachB1B1Split
+
+
+/-!
+# Tail segment (b1-b1 low×low): unbalanced small-end mass and second-moment C-S.
+
+## Q4 — Can the minimal tail form rely only on "small-end count + one-sided
+second moment + C-S"?
+
+**No.** A C-S pairing across the two low sides needs the *large-end* second
+moment as well; the genuinely new step in this frontier is the **two-sided
+second-moment envelope** (small-end moment over `m ≤ x` combined with the
+large-end moment over `k ≤ n`), not merely swapping the b1-b4 high-band
+enumeration for a `b`-side count. The large-end moment should go through the
+Parseval / offWave L² machine already proved in the far segment; the small-end
+side is the elementary count/mass bound below.
+
+## Status of the pieces
+
+1. `b1B1_prefix_energy_le` — G4 already proved in Stack (`b1B1_cofactor_prefix_energy_le`
+   L6855); this block only forwards it, **no reproof**.
+2. `b1B1_small_cofactor_count` / `b1B1_small_cofactor_mass_le` — pure counting
+   and elementary von Mangoldt mass bound; complete proofs.
+3. `b1B1_tau1_inf_le` / `b1B1_one_sided_second_moment_le` — pointwise L∞ and
+   the trivial one-sided second moment derived from it; complete proofs.
+4. `b1B1_unbalanced_tail_le` — the C-S closure; **sorry** at the two-sided
+   second-moment envelope step (the only new estimate in this frontier).
+
+## Reference / Stack anchors
+
+- Coefficient L∞: `b1B1_tau1_coeff_le` Stack L7006 (ref `abs_lowBandCoefficient_le` L6818).
+- G4 prefix energy: `b1B1_cofactor_prefix_energy_le` Stack L6855.
+- Budget: `logBudget n = 1 + Real.log (n + 2)` Stack L5625.
+- Target shape (NewMath skeleton `unbalanced_tail_bound`):
+  `‖Σ_{m≤x} τ₁(n,m)·τ₁(n,n-m)‖ ≤ 8·T⁴·logBudget n²·n^{7/8}`,
+  `x ≤ n^{3/4}`; exponent `7/8 = 1/2 + θ/2`, `θ = 3/4`.
+-/
+
+namespace GoldbachB1B1Tail
+
+open Finset Complex ArithmeticFunction
+open scoped BigOperators
+open GoldbachB1B1 GoldbachB1B1Scale GoldbachB1B1Adapt
+open GoldbachB1B1LowCoeff GoldbachB1B1NewMath
+open DyadicMixedB4EnergyTail
+
+noncomputable section
+
+-- ===========================================================================
+-- 1. G4 forwarding: cofactor prefix second moment (already proved in Stack)
+-- ===========================================================================
+
+-- SOURCE: Stack L6855 `b1B1_cofactor_prefix_energy_le` (G4 / T3).
+-- DIFF: forwarding wrapper only; the proof lives in the Stack G4 theorem and
+--       must NOT be reproved here.
+theorem b1B1_prefix_energy_le (n a : ℕ) (hB : a ≤ B₁ n) :
+    let Y := n / a
+    ((∑ b ∈ Ioc (U n) Y, ‖vonMangoldt b‖ ^ 2) : ℝ) ≤
+      (Y : ℝ) * Real.log ((Y : ℝ) + 2) ^ 2 :=
+  b1B1_cofactor_prefix_energy_le n a hB
+
+-- ===========================================================================
+-- 2. Small-end count and elementary von Mangoldt mass bound
+-- ===========================================================================
+
+-- SOURCE: elementary count; no direct reference theorem (b1-b4 absorbs the
+-- large end via highAtoms enumeration, so this small-end count has no ref
+-- counterpart).
+-- DIFF: low×low only; counts `b ∈ (U n, X]` with `X ≤ n^{3/4}`.
+theorem b1B1_small_cofactor_count (n X : ℕ) :
+    ((Ioc (U n) X).card : ℝ) ≤ (X : ℝ) := by
+  have hsub : Ioc (U n) X ⊆ Icc 1 X := by
+    intro b hb
+    obtain ⟨_hu, hbX⟩ := mem_Ioc.mp hb
+    exact mem_Icc.mpr ⟨by omega, hbX⟩
+  have h : (Ioc (U n) X).card ≤ (Icc 1 X).card := Finset.card_le_card hsub
+  have hcard : (Icc 1 X).card = X := by simp [Nat.card_Icc]
+  have h2 : (Ioc (U n) X).card ≤ X := h.trans (by rw [hcard])
+  exact_mod_cast h2
+
+-- SOURCE: elementary von Mangoldt mass; `vonMangoldt_le_log` (Mathlib
+-- ArithmeticFunction), used already at Stack L7009/L7014.
+-- DIFF: low×low small-end mass `Σ_{b≤X} |Λ b| ≤ X·log n`.
+theorem b1B1_small_cofactor_mass_le (n X : ℕ) (hn : 0 < n) (hX : X ≤ n) :
+    (∑ b ∈ Ioc (U n) X, ‖vonMangoldt b‖ : ℝ) ≤
+      (X : ℝ) * Real.log n := by
+  have hle : ∀ b ∈ Ioc (U n) X, ‖vonMangoldt b‖ ≤ Real.log n := by
+    intro b hb
+    have bLeN : b ≤ n := (mem_Ioc.mp hb).2.trans hX
+    have bPos : 0 < b := by have hbU := (mem_Ioc.mp hb).1; omega
+    exact (vonMangoldt_le_log (n := b)).trans
+      (Real.log_le_log (by exact_mod_cast bPos) (by exact_mod_cast bLeN))
+  calc
+    _ ≤ ∑ b ∈ Ioc (U n) X, Real.log n := sum_le_sum hle
+    _ = ((Ioc (U n) X).card : ℝ) * Real.log n := by
+      rw [sum_const, nsmul_eq_mul, mul_comm]
+    _ ≤ (X : ℝ) * Real.log n :=
+      mul_le_mul_of_nonneg_right (b1B1_small_cofactor_count n X)
+        (Real.log_nonneg (by exact_mod_cast hn))
+
+-- ===========================================================================
+-- 3. Coefficient L∞ and trivial one-sided second moment
+-- ===========================================================================
+
+-- SOURCE: ref `abs_lowBandCoefficient_le` L6818; Stack `b1B1_tau1_coeff_le` L7006.
+-- DIFF: wraps the Stack L∞ bound with the divisor envelope `T`, and folds
+--       `Real.log n ≤ logBudget n`.
+theorem b1B1_tau1_inf_le (n m : ℕ) (mBound : m ≤ n) (nPositive : 0 < n)
+    {T : ℝ} (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    |τ₁ n m| ≤ T ^ 2 * logBudget n := by
+  have h := b1B1_tau1_coeff_le n m mBound nPositive
+  have dBound : (m.divisors.card : ℝ) ≤ T := divisorBound m mBound
+  have logN : Real.log n ≤ logBudget n := by
+    have h1 : Real.log n ≤ Real.log ((n : ℝ) + 2) :=
+      Real.log_le_log (by positivity) (by linarith)
+    exact h1.trans (le_add_of_nonneg_right zero_le_one)
+  calc
+    |τ₁ n m| ≤ (m.divisors.card : ℝ) ^ 2 * Real.log n := h
+    _ ≤ T ^ 2 * logBudget n := by gcongr
+
+-- SOURCE: one-sided second moment; derived pointwise from `b1B1_tau1_inf_le`.
+-- DIFF: this is the trivial L² bound on one side only; it does NOT yet perform
+--       the two-sided C-S pairing (see `b1B1_unbalanced_tail_le`).
+theorem b1B1_one_sided_second_moment_le (n x : ℕ) (hn : 2 ≤ n)
+    {T : ℝ} (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    (∑ m ∈ range (x + 1), |τ₁ n m| ^ 2 : ℝ) ≤
+      ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 := by
+  have nPositive : 0 < n := by omega
+  refine sum_le_sum fun m hm => ?_
+  have mBound : m ≤ n := (Finset.mem_range.mp hm).trans (by omega)
+  have hinf := b1B1_tau1_inf_le n m mBound nPositive divisorBound
+  have hnonneg : 0 ≤ T ^ 2 * logBudget n := by positivity
+  calc
+    |τ₁ n m| ^ 2 ≤ (T ^ 2 * logBudget n) ^ 2 :=
+      pow_le_pow_right₀ (by positivity) hinf
+    _ = T ^ 4 * logBudget n ^ 2 := by ring
+
+-- ===========================================================================
+-- 4. Unbalanced tail C-S closure (the only new estimate; sorry at the envelope)
+-- ===========================================================================
+
+/-!
+Chain (§10.2):
+1. Pointwise `|τ₁(n,m)| ≤ T²·logBudget n` (`b1B1_tau1_inf_le`).
+2. Small-end second moment `Σ_{m≤x}|τ₁|² ≤ (x+1)·T⁴·logBudget n²`
+   (`b1B1_one_sided_second_moment_le`); large-end moment over `k≤n`
+   — open two-sided envelope, see TODO below.
+3. C-S: `|Σ_{m≤x} τ₁(n,m)·τ₁(n,n-m)| ≤ T⁴·logBudget n²·√x·√n`.
+4. `x ≤ n^{3/4}` → `√x·√n ≤ n^{7/8}`, absorbed by main `n^{23/24}`.
+-/
+
+-- SOURCE: NewMath skeleton `unbalanced_tail_bound` (Stack NewMath L65;
+-- ref chain §10.2).
+-- DIFF: low×low target; coefficient side uses `τ₁ n`.
+theorem b1B1_unbalanced_tail_le (n : ℕ) (hn : 2 ≤ n) {T : ℝ} (TNonneg : 0 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T)
+    (x : ℕ) (hx : x ≤ n) (hxpow : (x : ℝ) ≤ (n : ℝ) ^ (3 / 4 : ℝ)) :
+    ‖∑ m ∈ range (x + 1), (τ₁ n m : ℂ) * (τ₁ n (n - m) : ℂ)‖ ≤
+      8 * T ^ 4 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by
+  sorry
+  -- TODO: 双侧二阶矩 Σ|τ₁|² ≤ T⁴·logBudget²·x（小端）与 ≤ T⁴·logBudget²·n
+  --       （大端）的包络——本格唯一新估计。
+  --  1. 大端二阶矩：不能再走 b1-b4 的 highAtoms 枚举；需经 Parseval /
+  --     offWave L² 机器（far 段 `intervalIntegrable_offWave_norm_sq` L6467、
+  --     `offWave_mass_le_weighted` L6569）给出 `Σ_{k≤n}|τ₁|² ≤ n·T⁴·logBudget²`。
+  --  2. C-S 配对：小端矩根 √(x+1) 与大端矩根 √n 相乘，常数取 8，
+  --     对数幂 k=2。
+  --  3. 指数折算：`x ≤ n^{3/4}` ⇒ `√x·√n ≤ n^{7/8}`，核验被 main
+  --     `finalScale` 的 `n^{23/24}` 吸收（7/8 = 0.875 < 23/24 ≈ 0.9583）。
+
+end
+
+end GoldbachB1B1Tail
+
+
+/-!
+# Smoothing segment (b1-b1 low×low): near-pair replacement cost.
+
+Port of reference `type2_refs/L_goldbach_frontier_type2_b1_b4.lean`
+L7240–7350 (`norm_windowKernel_difference_le` L7250,
+`norm_sum_windowKernel_difference_le` L7268, `norm_nearPair_replacement_le` L7339).
+
+## Port lemmas reused (verified by Grep against `Scratch_B1B1_Port.lean`)
+
+| Port lemma / def | Port line | Namespace |
+|---|---|---|
+| `phase` / `wave` | L27 / L28 | `DyadicMixedB4Geometric` |
+| `radius` / `radius_le_product` | L609 / L621 | `DyadicMixedB4Geometric` |
+| `window` | L615 | `DyadicMixedB4ArcGeometry` |
+| `ramanujan` | L875 | `DyadicMixedB4ArcCenters` |
+| `progressionAverage` / `progressionAverage_continuous` | L1001 / L1515 | `ProgressionApprox` / `WindowKernel` |
+| `innerRadius` / `innerRadius_nonnegative` | L1441 / L1445 | `DyadicMixedB4WindowKernel` |
+| `window_subset_interval` | L1449 | `DyadicMixedB4WindowKernel` |
+| `norm_window_replacement_le` | L1488 | `DyadicMixedB4WindowKernel` |
+| `scalarKernel` / `windowKernel` | L1511 / L1656 | `DyadicMixedB4WindowKernel` |
+| `integral_progression_window` | L1525 | `DyadicMixedB4WindowKernel` |
+| `radius_nonnegative` | L1443 | `DyadicMixedB4WindowKernel` |
+| `sum_norm_shifted_ramanujan_le` | L4243 | `DyadicMixedB4Ramanujan` |
+
+## Parameter mapping (ref → low×low)
+
+`cutoffU ↦ U n`, `cutoffB ↦ B₁ n`, `maximumStep ↦ BM n (= b1B1_stepLow n)`,
+`cutoffH ↦ BH n`, `cutoffR ↦ BR n`. Atoms live in `lowAtomSet n`
+(`GoldbachB1B1LowAtoms`, Stack L7223); step `lowAtomStep = p.1 = a`,
+window indices `lowAtomLower = p.2-1`, `lowAtomUpper = p.2`.
+
+## Weight budget (DIFF vs reference)
+
+- Coefficient side `A`: the low-band coefficient `τ₁ n m` still has the
+  two-divisor bound `|τ₁| ≤ d(m)²·log n` (Stack `b1B1_tau1_coeff_le` L7006),
+  so `A = T²·logBudget n` is **not** downgraded.
+- Atom side `W`: `lowAtomWeight` carries one inner μ-sum; its bound uses a
+  single divisor factor, `W = T·logBudget n` (single `T`, DIFF from the
+  reference `atomWeight` whose μ factor is a single `-μ d`).
+-/
+
+namespace GoldbachB1B1Smooth
+
+open Finset Filter ArithmeticFunction
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry DyadicMixedB4ArcCenters
+open DyadicMixedB4ProgressionApprox DyadicMixedB4WindowKernel DyadicMixedB4KernelControl
+open DyadicMixedB4Ramanujan DyadicMixedB4EnergyTail
+open GoldbachB1B1 GoldbachB1B1Adapt GoldbachB1B1LowAtoms
+
+-- ======================================================================
+-- 1. Single-cell kernel difference (port of ref L7250)
+-- ======================================================================
+
+-- SOURCE: ref L7250 `norm_windowKernel_difference_le`
+-- DIFF: none structural; parameters renamed to the low×low envelope.
+theorem b1B1_norm_windowKernel_difference_le (n M B H q g l r : ℕ) (s : ℝ)
+    (gPositive : 0 < g) (radiusBound : (g : ℝ) * radius M ≤ 1 / 2) :
+    ‖(∫ t in window n M B H q, phase (s * t) * wave g l r t) -
+      (windowKernel n M B H q g l r s : ℂ)‖ ≤ 2 * Real.pi * (2 * radius M) := by
+  have phaseContinuous : Continuous (fun t : ℝ => phase (s * t)) := by
+    unfold phase; fun_prop
+  have waveContinuous : Continuous (wave g l r) := by
+    unfold wave phase; fun_prop
+  have waveIntegrable : IntegrableOn (fun t => phase (s * t) * wave g l r t)
+      (window n M B H q) :=
+    ((phaseContinuous.mul waveContinuous).continuousOn.integrableOn_Icc).mono_set
+      (window_subset_interval n M B H q)
+  have averageIntegrable : IntegrableOn
+      (fun t => phase (s * t) * progressionAverage g l r t) (window n M B H q) :=
+    ((phaseContinuous.mul (progressionAverage_continuous g l r)).continuousOn
+      .integrableOn_Icc).mono_set (window_subset_interval n M B H q)
+  change ‖(∫ t in window n M B H q, phase (s * t) * wave g l r t) -
+      Complex.ofReal (scalarKernel g l r (radius M) s -
+        if q ≤ B then scalarKernel g l r (innerRadius n M H q) s else 0)‖ ≤ _
+  rw [← integral_progression_window,
+    ← integral_sub waveIntegrable averageIntegrable]
+  simp only [← mul_sub]
+  exact norm_window_replacement_le n M B H q g l r s gPositive radiusBound
+
+-- ======================================================================
+-- 2. Modulus-summed kernel difference (port of ref L7268)
+-- ======================================================================
+
+-- SOURCE: ref L7268 `norm_sum_windowKernel_difference_le`
+-- DIFF: none structural; `a` is the low-coefficient function `τ₁ n ·`.
+theorem b1B1_norm_sum_windowKernel_difference_le (n M B H q g l r : ℕ) [NeZero q]
+    (a : ℕ → ℂ) (qLower : 1 < q) (gPositive : 0 < g)
+    (radiusBound : (g : ℝ) * radius M ≤ 1 / 2)
+    {A : ℝ} (aBound : ∀ m ∈ range (n + 1), ‖a m‖ ≤ A) (ANonnegative : 0 ≤ A) :
+    ‖(∑ m ∈ range (n + 1), a m * ramanujan q ((m : ℤ) - n) *
+        ∫ t in window n M B H q,
+          phase ((((m : ℤ) - (n : ℤ) : ℤ) : ℝ) * t) * wave g l r t) -
+      ∑ m ∈ range (n + 1), a m * ramanujan q ((m : ℤ) - n) *
+        (windowKernel n M B H q g l r ((m : ℝ) - (n : ℝ)) : ℝ)‖ ≤
+      (A * (2 * Real.pi * (2 * radius M))) * ((q.divisors.card : ℝ) * ((n : ℝ) + q)) := by
+  let C := 2 * Real.pi * (2 * radius M)
+  have CNonneg : 0 ≤ C := by
+    unfold C; positivity
+  rw [← sum_sub_distrib]
+  simp only [← mul_sub]
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ m ∈ range (n + 1), (A * C) * ‖ramanujan q ((m : ℤ) - n)‖ := by
+      refine sum_le_sum fun m membership => ?_
+      simp only [norm_mul]
+      rw [mul_right_comm]
+      exact mul_le_mul_of_nonneg_right
+        (mul_le_mul (aBound m membership)
+          (b1B1_norm_windowKernel_difference_le n M B H q g l r
+            ((m : ℝ) - (n : ℝ)) gPositive radiusBound)
+          (norm_nonneg _) ANonnegative) (norm_nonneg _)
+    _ = (A * C) * ∑ m ∈ range (n + 1), ‖ramanujan q ((m : ℤ) - n)‖ :=
+      (mul_sum _ _ _).symm
+    _ ≤ _ := mul_le_mul_of_nonneg_left (sum_norm_shifted_ramanujan_le qLower n)
+      (mul_nonneg ANonnegative CNonneg)
+
+-- ======================================================================
+-- 3. Atom weight bound (atom side, single `T`)
+-- ======================================================================
+
+-- SOURCE: ref L6746 `norm_atomWeight_le_log`; L6804 `abs_lowMoebiusWeight_le`.
+-- DIFF: reference weight is `-(μ d)·Λ b` (μ ≤ 1 directly); ours is the inner
+-- μ-sum `Σ_{d|a,U<d} μ d` times `Λ b`, so the inner sum is bounded by the
+-- divisor card of `a` (one divisor factor → one `T`).
+theorem b1B1_lowAtomWeight_bound (n : ℕ) {p : ℕ × ℕ} (hp : p ∈ lowAtomSet n)
+    {T : ℝ} (TNonnegative : 0 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖lowAtomWeight n p‖ ≤ T * logBudget n := by
+  have hmem : U n < p.1 ∧ p.1 ≤ B₁ n ∧ U n < p.2 ∧ p.1 * p.2 ≤ n :=
+    mem_lowAtomSet.mp hp
+  have p2Pos : 0 < p.2 := by have := hmem.2.2.1; omega
+  have aDivM : p.1 ∣ p.1 * p.2 := by exact ⟨p.2, by ring⟩
+  -- divisor card monotonic under divisibility: τ(a) ≤ τ(a·b)
+  have cardMonotone : (p.1.divisors.card : ℝ) ≤ ((p.1 * p.2).divisors.card : ℝ) := by
+    apply Nat.cast_le.mpr
+    apply card_le_card
+    intro d hd
+    exact Nat.mem_divisors.mpr ⟨(Nat.dvd_of_mem_divisors hd).trans aDivM, by omega⟩
+  have innerBound : |(∑ d ∈ (Nat.divisors p.1).filter (fun d => U n < d), μ d : ℝ)| ≤
+      (p.1.divisors.card : ℝ) := by
+    set s := (Nat.divisors p.1).filter (fun d => U n < d)
+    have h : ‖(∑ d ∈ s, μ d : ℝ)‖ ≤ ∑ d ∈ s, ‖(μ d : ℝ)‖ := norm_sum_le s (fun d => μ d)
+    rw [Real.norm_eq_abs] at h
+    calc
+      _ ≤ ∑ d ∈ s, |μ d| := h
+      _ ≤ ∑ d ∈ s, (1 : ℝ) := by
+        refine sum_le_sum fun d _ => ?_
+        have key : |(ArithmeticFunction.moebius d : ℝ)| ≤ 1 := by
+          exact_mod_cast abs_moebius_le_one (n := d)
+        simpa [μ] using key
+      _ ≤ ∑ _ ∈ Nat.divisors p.1, (1 : ℝ) :=
+        sum_le_sum_of_subset_of_nonneg (filter_subset _ _) (fun _ _ _ => zero_le_one)
+      _ = _ := by rw [sum_const, nsmul_eq_mul, mul_one]
+  have cardA : (p.1.divisors.card : ℝ) ≤ T :=
+    cardMonotone.trans (divisorBound (p.1 * p.2) hmem.2.2.2)
+  have logB : ArithmeticFunction.vonMangoldt p.2 ≤ logBudget n :=
+    vonMangoldt_le_log.trans (Real.log_le_log (by exact_mod_cast p2Pos)
+      (by exact_mod_cast hmem.2.2.2))
+  unfold lowAtomWeight
+  rw [norm_mul, Complex.norm_real, Real.norm_eq_abs, abs_of_nonneg vonMangoldt_nonneg]
+  exact mul_le_mul (innerBound.trans cardA) logB vonMangoldt_nonneg (Nat.cast_nonneg _)
+
+-- ======================================================================
+-- 4. Fibre bound (step fibres over `lowAtomStep = a`)
+-- ======================================================================
+
+-- SOURCE: ref L6759 `sum_atomWeight_fibre_le`.
+-- DIFF / TODO: reference step = d·b, so its fibre injects into divisors of the
+-- step and `fibre.card ≤ τ(u)`. Our step = a (the product `a·b` stays in the
+-- mode layer), so the fibre over `u = a` contains every admissible cofactor
+-- `b ≤ n/u`; the elementary bound below carries an `n/u` factor. This factor
+-- does NOT fit the `W = T·logBudget` offWave budget (see assembly §11.3-2);
+-- a tighter cancellation bound, or a mode-level far/near decomposition, is
+-- still required before this fibre lemma can feed the budget layer.
+theorem b1B1_lowAtomWeight_fibre_le (n : ℕ) {u : ℕ} (hu : u ∈ Icc 1 (BM n))
+    {T : ℝ} (TNonnegative : 0 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ∑ p ∈ (lowAtomSet n).filter (fun p => lowAtomStep n p = u),
+      ‖lowAtomWeight n p‖ ≤ T * (n / u) * logBudget n := by
+  -- TODO: prove `Σ_{b ∈ Ioc (U n) (n/u)} Λ b ≤ (n/u)·logBudget n`
+  -- (elementary von Mangoldt prefix bound); then fold the per-atom bound above.
+  sorry
+
+-- ======================================================================
+-- 5. Abstract near-pair replacement (port of ref L7339 `norm_nearPair_replacement_le`)
+-- ======================================================================
+
+-- SOURCE: ref L7339–7407.
+-- Parameterized over an abstract atom type `ι` so the lemma does not depend
+-- on the concrete `exactNearPair` / `smoothedNearPair` objects (which are
+-- still placeholder defs in Stack L6911–6912).
+--
+-- `exactAtom i q`, `smoothedAtom i q` are the per-(atom,modulus) near-atom
+-- sums; `atomDiff` is the per-cell kernel-difference bound supplied by
+-- lemma 2 above (ref L7372 calls `norm_sum_windowKernel_difference_le` there).
+theorem b1B1_nearPair_replacement_le {ι : Type*} (n M B H R : ℕ)
+    {A T W : ℝ} (ANonnegative : 0 ≤ A) (TNonnegative : 0 ≤ T)
+    (WNonnegative : 0 ≤ W)
+    (a : ℕ → ℂ) (aBound : ∀ m ∈ range (n + 1), ‖a m‖ ≤ A)
+    (tBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T)
+    (items : Finset ι) (step lower upper : ι → ℕ) (weight : ι → ℂ)
+    (stepRange : ∀ i ∈ items, 0 < step i ∧ step i ≤ M)
+    (stepLeN : ∀ i ∈ items, step i ≤ n)
+    (moduli : ι → Finset ℕ)
+    (moduliMem : ∀ i ∈ items, ∀ q ∈ moduli i, R < q ∧ q ∣ step i)
+    (wBound : ∀ u ∈ Icc 1 M,
+      (∑ i ∈ items.filter (fun i => step i = u), ‖weight i‖) ≤ W)
+    (exactAtom smoothedAtom : ι → ℕ → ℂ)
+    (atomDiff : ∀ i ∈ items, ∀ q ∈ moduli i,
+      ‖exactAtom i q - smoothedAtom i q‖ ≤
+        A * (2 * Real.pi * (2 * radius M)) * T * (2 * (n : ℝ))) :
+    ‖(∑ i ∈ items, weight i * ∑ q ∈ moduli i, exactAtom i q) -
+      (∑ i ∈ items, weight i * ∑ q ∈ moduli i, smoothedAtom i q)‖ ≤
+      (A * (2 * Real.pi * (2 * radius M)) * T ^ 2 * (2 * (n : ℝ))) *
+        ((M : ℝ) * W) := by
+  let radiusError := 2 * Real.pi * (2 * radius M)
+  let C : ℝ := A * radiusError * T * (2 * (n : ℝ))
+  have radiusNonnegative : 0 ≤ radiusError := by
+    unfold radiusError
+    exact mul_nonneg (by positivity) (mul_nonneg (by norm_num) (radius_nonnegative M))
+  have CNonnegative : 0 ≤ C := by unfold C; positivity
+  have individual (i : ι) (iMember : i ∈ items) (q : ℕ) (qMember : q ∈ moduli i) :
+      ‖exactAtom i q - smoothedAtom i q‖ ≤ C :=
+    atomDiff i iMember q qMember
+  have inner (i : ι) (iMember : i ∈ items) :
+      ‖∑ q ∈ moduli i, (exactAtom i q - smoothedAtom i q)‖ ≤ T * C := by
+    refine (norm_sum_le _ _).trans ?_
+    calc
+      _ ≤ ∑ _ ∈ moduli i, C := sum_le_sum fun q qMember => individual i iMember q qMember
+      _ ≤ ∑ _ ∈ (step i).divisors, C :=
+        sum_le_sum_of_subset_of_nonneg
+          (fun q hq => Nat.mem_divisors.mpr ⟨(moduliMem i iMember q hq).2,
+            Nat.ne_of_gt (stepRange i iMember).1⟩)
+          (fun _ _ _ => CNonnegative)
+      _ ≤ _ := by
+        rw [sum_const, nsmul_eq_mul]
+        exact mul_le_mul_of_nonneg_right
+          (tBound (step i) (stepLeN i iMember)) CNonnegative
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ i ∈ items, ‖weight i‖ * (T * C) := by
+      refine sum_le_sum fun i membership => ?_
+      rw [norm_mul]
+      exact mul_le_mul_of_nonneg_left (inner i membership) (norm_nonneg _)
+    _ = (∑ i ∈ items, ‖weight i‖) * (T * C) := (sum_mul _ _ _).symm
+    _ ≤ ((M : ℝ) * W) * (T * C) := by
+      have mapsTo (i : ι) (member : i ∈ items) : step i ∈ Icc 1 M :=
+        mem_Icc.mpr ⟨(stepRange i member).1, (stepRange i member).2⟩
+      have sumFibre : (∑ i ∈ items, ‖weight i‖) =
+          ∑ u ∈ Icc 1 M, ∑ i ∈ items.filter (fun i => step i = u), ‖weight i‖ :=
+        (sum_fiberwise_of_maps_to mapsTo _).symm
+      exact mul_le_mul_of_nonneg_right
+        (sumFibre.le.trans (sum_le_sum fun u hu => wBound u hu))
+        (mul_nonneg TNonnegative CNonnegative)
+    _ = _ := by unfold C radiusError; ring
+
+-- ======================================================================
+-- 6. Segment-level theorem (placeholder wiring + budget fold)
+-- ======================================================================
+
+-- SOURCE: ref L7818 `smoothing_budget_le`; segment skeleton Stack L6931.
+-- TODOs before this can close:
+--   1. Compile-agent's atom-pair layer must replace the zero placeholders
+--      `b1B1_exactNearPair` / `b1B1_smoothedNearPair` (Stack L6911–6912)
+--      with the real `Σ_i weight i Σ_q exactAtom/smoothedAtom` forms, and
+--      supply the `aBound` / `wBound` hypotheses to lemma 5.
+--   2. Budget fold: mirror ref L7818. Low×low step `M = n^{2/5}`, so
+--      `n/M = n^{3/5} ≤ n^{23/24}`; with `A = T²·logBudget`, `W = T·logBudget`
+--      the replacement bound is absorbed by `16·finalScale n T`
+--      (`finalScale = T⁵·logBudget⁷·n^{23/24}`, Stack L6896).
+theorem b1B1_smoothing_le_aux (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖GoldbachB1B1Assembly.b1B1_exactNearPair n -
+      GoldbachB1B1Assembly.b1B1_smoothedNearPair n‖ ≤
+      16 * GoldbachB1B1Assembly.finalScale n T := by
+  -- TODO (1): wire concrete exact/smoothed near pairs; apply
+  -- `b1B1_nearPair_replacement_le` with `items := lowAtomSet n`,
+  -- `step := lowAtomStep n`, `lower := lowAtomLower`, `upper := lowAtomUpper`,
+  -- `weight := lowAtomWeight n`.
+  -- TODO (2): fold the replacement bound through the budget arithmetic
+  -- (`n/M = n^{3/5} ≤ n^{23/24}`) to `16·finalScale n T`.
+  sorry
+
+end GoldbachB1B1Smooth
+
+
+/-!
+# Main segment (b1-b1 low×low): primitive near pair.
+
+Port of reference `type2_refs/L_goldbach_frontier_type2_b1_b4.lean`
+L7554–7713 (`shortIndices` L7554, `primitiveDyadPair` L7557,
+`primitiveNearPair_eq_sum_dyads` L7565, `norm_primitiveDyadPair_le` L7594,
+`norm_primitiveNearPair_le` L7699), with the dyad helpers from L6148–6172
+and the log bound from L5933.
+
+## Q3 — Does the main segment hit the §11.3-2 "fibre `n/u` factor" break?
+
+**Yes.** The main aggregate machine `sum_weighted_moduli_le`
+(Stack L5356, hypothesis `weightBound` L5359) requires, for every step `u`,
+the per-step fibre weight sum to be `≤ W`:
+
+```
+∀ u, Σ_{i : step i = u} weight i ≤ W
+```
+
+In the reference, `highAtoms` step `= d·b`, so the fibre over `u` injects
+divisors of `u` (cardinality `≤ τ(u)`) and `W = T·logBudget n` closes.
+
+In the naive low×low pair atom `(a, b)` with step `= a` (see atom layer
+`GoldbachB1B1LowAtoms` Stack L7223/L7228), the fibre over `u = a` contains
+**all cofactors** `b ≤ n/u`; its weight sum carries a `n/u` factor and does
+**not** fit `W = T·logBudget n`.
+
+### Minimal viable alternatives
+
+- **(C) RECOMMENDED — enumerate the divisor side only, do not put `b` in the
+  outer atom.** The Port `primitiveBlock` (Stack L5066) already sums the
+  cofactor internally: `∑ a ∈ indices, w a * ∑ b ∈ Ioc U (n/a), Λ b * …`.
+  The outer atom should therefore be indexed by `a` alone, weight `= inner
+  μ-sum(a)`, step `= a`; the fibre over `u` has at most one entry, so the
+  fibre bound is the single divisor bound `≤ T·logBudget n` with no `n/u`
+  factor. The `Λ b` cofactor energy is carried by the inner `blockEnergy` /
+  G4 layer. This block's abstract lemmas are written against that shape.
+- (A) Step `= m = ab`: the fibre injects divisors of `m`, but `m` can exceed
+  `BM n = n^{2/5}`, violating `stepRange : step ∈ Icc 1 M`. **Infeasible.**
+- (B) Keep step `= a` and prove a tight cancellation bound on `Σ_b Λ b` over
+  the cofactor fibre: genuinely new arithmetic, the same open item as the
+  smoothing-block fibre TODO. Not proved here.
+
+## Port lemmas reused (Grep-verified against `Scratch_B1B1_Stack.lean`)
+
+| Port lemma / def | Stack line | Namespace |
+|---|---|---|
+| `primitiveBlock` | L5066 | `DyadicMixedB4BilinearBlock` |
+| `conductorCost` | L5311 | `DyadicMixedB4ModulusAggregate` |
+| `sum_modulus_cost_le` | L5324 | `DyadicMixedB4ModulusAggregate` |
+| `sum_weighted_moduli_le` | L5356 | `DyadicMixedB4ModulusAggregate` |
+| `norm_primitiveBlock_le` | L5416 | `DyadicMixedB4ModulusAggregate` |
+| `blockEnergy` / `blockEnergy_nonnegative` | L3769 / L5643 | `DyadicMixedB4PrimitiveEnergy` / `EnergyTail` |
+| `tailWeight` / `tailWeight_nonnegative` | L5637 / L5639 | `DyadicMixedB4EnergyTail` |
+| `radius` | L609 | `DyadicMixedB4Geometric` |
+| `logBudget` / `one_le_logBudget` | L5625 / L5627 | `DyadicMixedB4EnergyTail` |
+| `b1B1_one_add_log_step_le` | L7064 | `GoldbachB1B1Budget` |
+| `b1B1_log2_le_four_log` | L5868 | `GoldbachB1B1Scale` |
+
+## Ported-but-missing support (not in Stack; supplied here as small helpers
+or left as explicit TODO)
+
+- `dyadicIndices` / `dyadicBase` / `mem_dyadicInterval` / `dyadic_sum_partition`
+  (ref L6148/6150/6160/6168): ported below as `b1B1_*`.
+- `natLog_succ_le` (ref L5933): ported below as `b1B1_natLog_succ_le`.
+- `sum_energy_tails_le` (ref L6188, tail aggregate `51200·gcd·T²·log³·n^{31/32}`):
+  **not ported**; Stack only has the per-dyad piece `energy_tail_in_dyad_le`
+  L5645. Supplied to the abstract dyad lemma as a `tailBound` hypothesis.
+
+## Parameter mapping (ref → low×low)
+
+`cutoffU ↦ U n`, `cutoffB ↦ B₁ n`, `maximumStep ↦ BM n`,
+`cutoffH ↦ BH n`, `cutoffR ↦ BR n`; divisor-side indices
+`Ioc (U n) (B₁ n)` filtered by `Nat.log 2 a = k`; step `= a`.
+
+## Weight budget (DIFF vs reference)
+
+- Coefficient side `A`: `τ₁` still carries the two-divisor bound
+  `|τ₁| ≤ d(m)²·log n` (Stack `b1B1_tau1_coeff_le` L7006), so
+  `A = T²·logBudget n` is **not** downgraded.
+- Atom side `W`: outer divisor-side weight is the single inner μ-sum,
+  `W = T·logBudget n` (single `T`).
+-/
+
+namespace GoldbachB1B1Main
+
+open Finset Complex
+open scoped BigOperators
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry
+open DyadicMixedB4BilinearBlock DyadicMixedB4ModulusAggregate
+open DyadicMixedB4PrimitiveEnergy DyadicMixedB4EnergyTail
+open DyadicMixedB4BilinearEnergy DyadicMixedB4BlockModulus
+open GoldbachB1B1Scale GoldbachB1B1Adapt GoldbachB1B1Budget
+open GoldbachB1B1Assembly GoldbachB1B1GcdSeries
+
+noncomputable section
+
+-- ===========================================================================
+-- Dyadic partition helpers (ref L6148–L6172)
+-- ===========================================================================
+
+-- SOURCE: ref L6148 `dyadicIndices`
+-- DIFF: renamed `b1B1_dyadicIndices`; body unchanged.
+def b1B1_dyadicIndices (N : ℕ) : Finset ℕ :=
+  range (Nat.log 2 N + 1)
+
+-- SOURCE: ref L6150 `dyadicBase`
+-- DIFF: renamed `b1B1_dyadicBase`; body unchanged.
+def b1B1_dyadicBase (k : ℕ) : ℕ := 2 ^ k
+
+-- SOURCE: ref L6152 `dyadicBase_positive`
+theorem b1B1_dyadicBase_positive (k : ℕ) : 0 < b1B1_dyadicBase k :=
+  Nat.pow_pos (by decide)
+
+-- SOURCE: ref L6160 `mem_dyadicInterval`
+theorem mem_b1B1_dyadicInterval {a k : ℕ} (aPositive : 0 < a)
+    (logExact : Nat.log 2 a = k) :
+    a ∈ Ico (b1B1_dyadicBase k) (2 * b1B1_dyadicBase k) := by
+  subst k
+  refine mem_Ico.mpr ⟨Nat.pow_log_le_self 2 aPositive.ne', ?_⟩
+  unfold b1B1_dyadicBase
+  rw [← Nat.pow_succ']
+  exact Nat.lt_pow_succ_log_self (by decide) _
+
+-- SOURCE: ref L6168 `dyadic_sum_partition`
+theorem b1B1_dyadic_sum_partition {R : Type*} [AddCommMonoid R]
+    (s : Finset ℕ) (N : ℕ) (upper : ∀ a ∈ s, a ≤ N) (term : ℕ → R) :
+    (∑ a ∈ s, term a) =
+      ∑ k ∈ b1B1_dyadicIndices N, ∑ a ∈ s.filter (fun a => Nat.log 2 a = k), term a :=
+  (sum_fiberwise_of_maps_to (fun a member => mem_range.mpr
+    (Nat.lt_succ_of_le (Nat.log_mono_right (upper a member)))) term).symm
+
+-- ===========================================================================
+-- Log budget helper (ref L5933)
+-- ===========================================================================
+
+-- SOURCE: ref L5933 `natLog_succ_le`
+-- DIFF: renamed; `log2_le_four_log` → `b1B1_log2_le_four_log` (Stack L5868).
+theorem b1B1_natLog_succ_le {m n : ℕ} (nLower : 2 ≤ n) (mBound : m ≤ n) :
+    (Nat.log 2 m : ℝ) + 1 ≤ 5 * logBudget n := by
+  have hlog := b1B1_log2_le_four_log nLower
+  have hmono : (Nat.log 2 m : ℝ) ≤ Nat.log 2 (n + 2) := by
+    exact_mod_cast Nat.log_mono_right (mBound.trans (Nat.le_add_right n 2))
+  have hle : Real.log n ≤ logBudget n := by
+    have h1 : Real.log n ≤ Real.log ((n : ℝ) + 2) :=
+      Real.log_le_log (by positivity) (by linarith)
+    exact h1.trans (le_add_of_nonneg_right zero_le_one)
+  linarith only [hlog, hmono, hle, one_le_logBudget n]
+
+-- ===========================================================================
+-- Abstract per-dyad primitive pair bound (ref L7594 `norm_primitiveDyadPair_le`)
+-- ===========================================================================
+
+/-!
+The concrete low×low atom list (`highAtoms` analogue), its step/lower/upper
+accessors and its `lowMoebiusWeight` analogue are not yet wired in Stack.
+This lemma is therefore parameterized over the item type `ι`, the step and
+weight functions, the divisor-side indices and the block weight `w`; the tail
+aggregate `tailBound` is an explicit hypothesis (see Q3 and the missing-piece
+list above).
+
+Concrete wiring (alternative (C)):
+- `items`  : divisors `a ∈ Ioc (U n) (B₁ n)` (one entry per `a`);
+- `step i`  : `a`;
+- `weight i`: ‖inner μ-sum(a)‖, single divisor bound `≤ T·logBudget n`;
+- `indices`: `Ioc (U n) (B₁ n).filter (Nat.log 2 · = k)`;
+- `w a`    : inner μ-sum `a ↦ ℂ`.
+-/
+
+-- SOURCE: ref L7594 `norm_primitiveDyadPair_le`
+-- DIFF: (1) abstracted over `ι`/`step`/`weight`/`indices`/`w`;
+--       (2) `sum_energy_tails_le` (ref L6188, not ported) replaced by
+--           hypothesis `tailBound`;
+--       (3) constants: `maximumStep→BM`, `cutoffB→BB`, `cutoffH→BH`,
+--           `cutoffR→BR`; coefficient budget `A = T²·logBudget`,
+--           atom budget `W = T·logBudget` (single `T`).
+theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
+    {ι : Type*} (items : Finset ι) (step : ι → ℕ) (weight : ι → ℝ)
+    (A M R U B H lo hi : ℕ) (indices : Finset ℕ) (w : ℕ → ℂ)
+    {T : ℝ} (TNonnegative : 0 ≤ T)
+    (divisorBound : ∀ b ≤ n, (b.divisors.card : ℝ) ≤ T)
+    (MPositive : 0 < M) (APositive : 0 < A) (mN : M ≤ n)
+    (stepRange : ∀ i ∈ items, step i ∈ Icc 1 M)
+    (weightNonneg : ∀ i ∈ items, 0 ≤ weight i)
+    (weightBound : ∀ u ∈ Icc 1 M,
+        ∑ i ∈ items.filter (fun i => step i = u), weight i ≤ T * logBudget n)
+    (indexRange : indices ⊆ Ico A (2 * A))
+    (wBound : ∀ a ∈ indices, ‖w a‖ ≤ T)
+    (radiusUpper : radius M ≤ 1)
+    (stepLog : 1 + Real.log M ≤ logBudget n)
+    (energyNonneg : ∀ g ∈ Icc 1 (2 * A), ∀ d ∈ Icc 1 M,
+        0 ≤ blockEnergy n A U g d)
+    (tailBound : ∑ g ∈ Icc 1 (2 * A), ∑ d ∈ Icc 1 M, ∑ f ∈ n.divisors,
+        tailWeight R g f d * blockEnergy n A U g d ≤
+        51200 * gcdSeriesConstant * T ^ 2 * logBudget n ^ 3 *
+          (n : ℝ) ^ (31 / 32 : ℝ)) :
+    ‖∑ i ∈ items, weight i *
+        ∑ q ∈ (step i).divisors.filter (fun q => R < q),
+          primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
+      2048000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 6 *
+        (n : ℝ) ^ (31 / 32 : ℝ) := by
+  let G := Icc 1 (2 * A)
+  let D := Icc 1 M
+  let energy := blockEnergy n A U
+  let cost := conductorCost G D n.divisors energy
+  let W := T * logBudget n
+  let C := T ^ 2 * (16 + 24 * Real.log ((n : ℝ) + 1))
+  let tail := ∑ g ∈ G, ∑ d ∈ D, ∑ f ∈ n.divisors,
+      tailWeight R g f d * energy g d
+  have nPositive : 0 < n := by omega
+  have BNonnegative : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
+  have WNonnegative : 0 ≤ W := mul_nonneg TNonnegative BNonnegative
+  have CNonnegative : 0 ≤ C := by
+    unfold C
+    have : 0 ≤ Real.log ((n : ℝ) + 1) :=
+      Real.log_nonneg (by linarith [Nat.cast_nonneg (α := ℝ) n])
+    positivity
+  have each (i : ι) (iMember : i ∈ items) (q : ℕ)
+      (qMember : q ∈ (step i).divisors.filter (fun q => R < q)) :
+      ‖primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
+        C / (step i : ℝ) * cost q := by
+    obtain ⟨divisor, _⟩ := mem_filter.mp qMember
+    obtain ⟨positive, bound⟩ := mem_Icc.mp (stepRange i iMember)
+    exact norm_primitiveBlock_le n M B H q (step i) lo hi U A nPositive APositive
+      (Nat.pos_of_mem_divisors divisor)
+      ((Nat.le_of_dvd positive (Nat.dvd_of_mem_divisors divisor)).trans bound)
+      mN radiusUpper indices indexRange w TNonnegative wBound divisorBound
+  have mainBound := sum_weighted_moduli_le items step weight R M MPositive
+    WNonnegative stepRange weightBound G D n.divisors energy
+    (fun _ member => (mem_Icc.mp member).1)
+    (fun _ member => (mem_Icc.mp member).1)
+    (fun _ member => Nat.pos_of_mem_divisors member) energyNonneg
+  have logPlus : Real.log ((n : ℝ) + 1) ≤ logBudget n :=
+    (Real.log_le_log (by positivity) (by linarith)).trans
+      (le_add_of_nonneg_left zero_le_one)
+  have CBound : C ≤ 40 * T ^ 2 * logBudget n := by
+    unfold C
+    have h16 : 16 ≤ 16 * logBudget n := by
+      have := one_le_logBudget n
+      nlinarith
+    have h24 : 24 * Real.log ((n : ℝ) + 1) ≤ 24 * logBudget n := by gcongr
+    have hT : 0 ≤ T ^ 2 := by positivity
+    nlinarith
+  have mLogNonnegative : 0 ≤ 1 + Real.log (M : ℝ) :=
+    add_nonneg zero_le_one (Real.log_nonneg (by exact_mod_cast MPositive))
+  have tailNonnegative : 0 ≤ tail :=
+    sum_nonneg fun g _ => sum_nonneg fun d _ => sum_nonneg fun f _ =>
+      mul_nonneg (tailWeight_nonnegative _ _ _ _)
+        (blockEnergy_nonnegative _ _ _ _ _)
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ i ∈ items, weight i *
+        ∑ q ∈ (step i).divisors.filter (fun q => R < q),
+          C / (step i : ℝ) * cost q := by
+      refine sum_le_sum fun i member => ?_
+      rw [norm_mul]
+      have qFilter := (step i).divisors.filter (fun q => R < q)
+      have qBound : ‖∑ q ∈ qFilter, C / (step i : ℝ) * cost q‖ ≤
+          ∑ q ∈ qFilter, C / (step i : ℝ) * cost q :=
+        norm_sum_le qFilter _
+      exact mul_le_mul_of_nonneg_left
+        (qBound.trans (sum_le_sum (each i member))) (norm_nonneg (weight i))
+    _ = C * ∑ i ∈ items, (weight i / (step i : ℝ)) *
+        ∑ q ∈ (step i).divisors.filter (fun q => R < q), cost q := by
+      conv_rhs => rw [mul_sum]
+      refine sum_congr rfl fun _ _ => ?_
+      rw [← mul_sum]
+      ring
+    _ ≤ C * ((W * (1 + Real.log (M : ℝ))) * tail) :=
+      mul_le_mul_of_nonneg_left mainBound CNonnegative
+    _ ≤ (40 * T ^ 2 * logBudget n) * ((W * logBudget n) *
+          (51200 * gcdSeriesConstant * T ^ 2 * logBudget n ^ 3 *
+            (n : ℝ) ^ (31 / 32 : ℝ))) := by
+      apply mul_le_mul CBound _
+        (mul_nonneg (mul_nonneg WNonnegative mLogNonnegative) tailNonnegative)
+        (by positivity)
+      exact mul_le_mul
+        (mul_le_mul_of_nonneg_left stepLog WNonnegative)
+        tailBound tailNonnegative (mul_nonneg WNonnegative BNonnegative)
+    _ = _ := by unfold W; ring
+
+-- ===========================================================================
+-- Abstract near-pair bound over the dyadic partition (ref L7699)
+-- ===========================================================================
+
+-- SOURCE: ref L7699 `norm_primitiveNearPair_le`
+-- DIFF: (1) abstracted: the dyad sequence `nearPair k` is passed in;
+--       (2) per-dyad bound is the hypothesis `dyadBound` (output of the aux
+--           above); the `primitiveNearPair_eq_sum_dyads` partition identity
+--           is supplied by the concrete wiring via `b1B1_dyadic_sum_partition`.
+theorem b1B1_primitiveNearPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
+    {T : ℝ} (TNonnegative : 0 ≤ T) (nearPair : ℕ → ℂ)
+    (dyadBound : ∀ k ∈ b1B1_dyadicIndices n,
+        ‖nearPair k‖ ≤ 2048000 * gcdSeriesConstant * T ^ 5 *
+          logBudget n ^ 6 * (n : ℝ) ^ (31 / 32 : ℝ)) :
+    ‖∑ k ∈ b1B1_dyadicIndices n, nearPair k‖ ≤
+      10240000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 7 *
+        (n : ℝ) ^ (31 / 32 : ℝ) := by
+  let C := 2048000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 6 *
+    (n : ℝ) ^ (31 / 32 : ℝ)
+  have logNonnegative : 0 ≤ logBudget n :=
+    zero_le_one.trans (one_le_logBudget n)
+  have CNonnegative : 0 ≤ C := by
+    unfold C
+    have := gcdSeriesConstant_nonnegative
+    positivity
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ _ ∈ b1B1_dyadicIndices n, C :=
+      sum_le_sum fun k member => dyadBound k member
+    _ = ((Nat.log 2 n : ℝ) + 1) * C := by
+      simp [b1B1_dyadicIndices, nsmul_eq_mul]
+    _ ≤ (5 * logBudget n) * C :=
+      mul_le_mul_of_nonneg_right (b1B1_natLog_succ_le nLower le_rfl) CNonnegative
+    _ = _ := by unfold C; ring
+
+-- ===========================================================================
+-- Assembly target (Stack segment 5 `b1B1_main_le`, L6946)
+-- ===========================================================================
+
+-- NEEDS: 对象接线. `b1B1_primitiveNearPair` is currently the zero placeholder
+-- at Stack L6913; the real expansion must be fed into the two abstract lemmas
+-- above (alternative (C), divisor-side outer atom).
+--
+-- SOURCE: ref L7699 conclusion, re-expressed against Stack `finalScale` L6896.
+-- DIFF: ref tail exponent `n^{31/32}` vs Stack `finalScale` `n^{23/24}`;
+--       31/32 = 93/96 > 92/96 = 23/24, so the reference tail exponent is NOT
+--       absorbed by `finalScale`. The low×low tail energy must be recomputed
+--       to exponent `23/24` (see `NewMath.unbalanced_tail_bound` skeleton).
+theorem b1B1_main_le_aux (n : ℕ) (nLower : 2 ≤ n)
+    {T : ℝ} (TNonnegative : 0 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_primitiveNearPair n‖ ≤
+      (10240000 * gcdSeriesConstant) * finalScale n T := by
+  sorry
+  -- TODO:
+  --  1. 接线: 用 `b1B1_primitiveNearPair_le_aux` 喂入真实 dyad 序列;
+  --     items = 除数侧 `a ∈ Ioc (U n) (B₁ n)`, `step = a`,
+  --     weight = ‖inner μ-sum(a)‖; 内层 `indices k` 与 `w a` 取同一 μ-和。
+  --     暴露 Stack private `b1B1_inner_moebius_le` (L6985) 作为 `wBound`。
+  --  2. tailBound: 移植 ref L6188 `sum_energy_tails_le` (Stack 仅有逐 dyad
+  --     `energy_tail_in_dyad_le` L5645), 或由其聚合出尾能量界。
+  --  3. 指数折算: 低版尾能量需降到 `n^{23/24}` 以内 (ref 的 `n^{31/32}`
+  --     不被 `finalScale` 吸收); 依赖 NewMath `unbalanced_tail_bound` 闭合。
+  --  4. 若外层坚持枚举 pair `(a,b)` (而非方案 C), 须先闭合 smoothing 块
+  --     同款纤维紧界 TODO (`Σ_b Λ b` 的 `n/u` 因子)。
+
+end
+
+end GoldbachB1B1Main
+
+
+/-!
+# Far / outside segment (b1-b1 low×low): Young + offWave second moment.
+
+Port of reference `norm_outsidePairIntegral_le` L7201–7233, closed by the
+already-proved Stack budget lemma `b1B1_outside_budget_le` L7264.
+
+## 乘积可积性落在哪一步（硬要求回答）
+
+需要 `F·G` 乘积可积性的，是 Young / C-S 调用 `norm_indicator_product_le`
+(Stack L6407)：该引理先要求 `Measurable F`、`Measurable G` 与两侧范数
+平方可积 (`fSquareIntegrable` / `gSquareIntegrable`)，内部再由这两条构造
+`productMeasurable`（`F·G` 可测）与 `productIntegrable`（乘积可积）。
+
+- F 侧：`shiftedPolynomial_continuous` L7376 直接给出连续 ⇒ 可测、平方可积。
+- G 侧：`offWave` (Port/Stack L528) 只按单点 `wave` 定义为指示子，**没有**
+  给有限和现成的可测/可积件；`lowOutsidePolynomial n` 是它在 `lowAtomSet n`
+  上的有限和。这层"和"的可测性与范数平方可积性由本块两条独立引理承担：
+  `lowOutsidePolynomial_measurable`、`lowOutsidePolynomial_integrable_norm_sq`
+  （逐项套 `offWave_measurable` L6453 / `intervalIntegrable_offWave_norm_sq`
+  L6465）。这就是"对象接线"在 far 段的具体形态。
+
+## Verdict: zero new arithmetic
+
+The far segment reuses the far-segment machines already in Stack; the only
+wiring-dependent inputs are:
+- the coefficient L∞ bound `aBound` (from `b1B1_tau1_coeff_le` L7005);
+- the per-step fibre weight concentration `weightBound` (`W = T·logBudget n`),
+  the shared fibre TODO (see §12 of the assembly notes).
+
+## Stack anchors (Grep-verified)
+
+| Item | Stack line | Namespace |
+|---|---|---|
+| `shiftedPolynomial` / `shiftedPolynomial_continuous` / `shiftedPolynomial_parseval` | L7360 / L7376 / L7385 | `GoldbachB1B1Polynomial` |
+| `lowOutsidePolynomial` | L7421 | `GoldbachB1B1LowAtoms` |
+| `offWave_measurable` / `intervalIntegrable_offWave_norm_sq` | L6453 / L6465 | `GoldbachB1B1OffWave` |
+| `lowOffWave_mass_le` | L6610 | `GoldbachB1B1OffWave` |
+| `norm_indicator_product_le` | L6407 | `GoldbachB1B1Tool` |
+| `b1B1_wide_measurable` | L7532 | `GoldbachB1B1Split` |
+| `b1B1_outside_budget_le` / `b1B1_outsideScale_pos` | L7264 / L7241 | `GoldbachB1B1Budget` |
+
+## Budgets
+
+Coefficient side `A = T²·logBudget n` (two-divisor bound, not downgraded);
+atom side `W = T·logBudget n` (single `T`). Scale `S = BM n / √n`
+(`b1B1_outsideScale`).
+-/
+
+namespace GoldbachB1B1Far
+
+open Finset Complex MeasureTheory
+open scoped BigOperators
+open GoldbachB1B1 GoldbachB1B1Assembly GoldbachB1B1Adapt GoldbachB1B1Scale
+open GoldbachB1B1LowAtoms GoldbachB1B1OffWave GoldbachB1B1Tool
+open GoldbachB1B1Polynomial GoldbachB1B1Budget GoldbachB1B1LowCoeff
+open GoldbachB1B1Split
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry DyadicMixedB4EnergyTail
+
+noncomputable section
+
+-- ===========================================================================
+-- G 侧可测性 / 平方可积性（独立引理；和的接线形态）
+-- ===========================================================================
+
+-- SOURCE: ref L7215–7219（`outsidePolynomial` 可测 + 可积）。
+-- DIFF: 从抽象 item 列表落到具体 `lowAtomSet n`；`offWave` 单点定义在 L528，
+--       有限和逐项可测由 `offWave_measurable` L6453 给出。
+theorem lowOutsidePolynomial_measurable (n : ℕ) :
+    Measurable (lowOutsidePolynomial n) := by
+  unfold lowOutsidePolynomial
+  Finset.measurable_sum _ (fun p _ =>
+    measurable_const.mul
+      (offWave_measurable (radius (BM n)) p.1 (p.2 - 1) p.2))
+
+-- SOURCE: ref L7219 `intervalIntegrable_offWave_norm_sq`。
+-- DIFF: 具体实例化：items = `lowAtomSet n`，step/lo/hi/weight 取 LowAtoms 访问器。
+theorem lowOutsidePolynomial_integrable_norm_sq (n : ℕ) :
+    IntervalIntegrable (fun t => ‖lowOutsidePolynomial n t‖ ^ 2) volume 0 1 :=
+  intervalIntegrable_offWave_norm_sq (lowAtomSet n) (radius (BM n))
+    (fun p => lowAtomStep n p) (fun p => lowAtomLower p) (fun p => lowAtomUpper p)
+    (lowAtomWeight n)
+
+-- Outside set measurability: `(wide n (BB n) (BH n))ᶜ`.
+theorem b1B1_far_outside_measurable (n : ℕ) :
+    MeasurableSet (wide n (BB n) (BH n))ᶜ :=
+  (b1B1_wide_measurable n (BB n) (BH n)).compl
+
+-- ===========================================================================
+-- Abstract far bound: Young on `F·G` over the outside set, budget transitivity
+-- ===========================================================================
+
+/-!
+Parameters:
+- `F` : coefficient-side shifted polynomial;
+- `G` : offWave expansion over the low atom list;
+- `GMeasurable` / `Gint` : G 侧可测与平方可积（由上面两条具体引理提供）;
+- `weightBound` : per-step fibre weight sum ≤ W (the open fibre concentration).
+-/
+
+-- SOURCE: ref L7201 `norm_outsidePairIntegral_le`.
+-- DIFF: abstracted over `F`/`G` and the item list; the concrete low×low
+--       instantiation is `b1B1_far_le` below. The Young machine is Stack
+--       `norm_indicator_product_le` L6407; the mass bound is
+--       `lowOffWave_mass_le` L6610.
+theorem b1B1_far_le_aux {ι : Type*} (n : ℕ) (hn : 1 ≤ n)
+    (items : Finset ι) (g l r : ι → ℕ) (c : ι → ℂ)
+    (F G : ℝ → ℂ) (sMeasurable : MeasurableSet (wide n (BB n) (BH n))ᶜ)
+    {T A W : ℝ} (TLower : 1 ≤ T) (WNonnegative : 0 ≤ W)
+    (FContinuous : Continuous F)
+    (GMeasurable : Measurable G)
+    (Gint : IntervalIntegrable (fun t => ‖G t‖ ^ 2) volume 0 1)
+    (Fbound : (∫ t in (0 : ℝ)..1, ‖F t‖ ^ 2) ≤ ((n : ℝ) + 1) * A ^ 2)
+    (Gbound : (∫ t in (0 : ℝ)..1, ‖G t‖ ^ 2) ≤
+      128 * W ^ 2 * ((BM n : ℝ) ^ 2 * logBudget n ^ 2 +
+        (radius (BM n))⁻¹ * (1 + Real.log (BM n : ℝ)) ^ 3))
+    (gRange : ∀ i ∈ items, 0 < g i ∧ g i ≤ BM n)
+    (rRange : ∀ i ∈ items, r i ≤ n / g i)
+    (weightBound : ∀ u ∈ Icc 1 (BM n),
+      (∑ i ∈ items.filter (fun i => g i = u), ‖c i‖) ≤ W) :
+    ‖∫ t in (0 : ℝ)..1, (wide n (BB n) (BH n))ᶜ.indicator (fun x => F x * G x) t‖ ≤
+      577 * finalScale n T := by
+  have MOne : 1 ≤ BM n := Nat.le_floor (Real.one_le_rpow (by exact_mod_cast hn) (by norm_num))
+  have MPos : 0 < BM n := by exact_mod_cast MOne
+  have MBound : BM n ≤ n := b1B1_stepLow_le_n hn
+  have bPos : 0 < radius (BM n) := by unfold radius; positivity
+  have Fint : IntervalIntegrable (fun t => ‖F t‖ ^ 2) volume 0 1 :=
+    (FContinuous.norm.pow 2).intervalIntegrable 0 1
+  have productBound := norm_indicator_product_le (b1B1_outsideScale_pos hn)
+    sMeasurable FContinuous.measurable GMeasurable Fint Gint
+  refine productBound.trans ?_
+  exact mul_le_mul_of_nonneg_left
+    (add_le_add (mul_le_mul_of_nonneg_left Fbound (b1B1_outsideScale_pos hn).le)
+      (mul_le_mul_of_nonneg_left Gbound (inv_nonneg.mpr (b1B1_outsideScale_pos hn).le)))
+    (by norm_num)
+
+-- ===========================================================================
+-- Concrete low×low far bound (replaces Stack skeleton `b1B1_far_le` L6924)
+-- ===========================================================================
+
+/-!
+## NEEDS（对象接线；名字 + 类型）
+
+`b1B1_outsidePair_eq`：
+  `b1B1_outsidePair n = ∫ t in (0:ℝ)..1,`
+    `(wide n (BB n) (BH n))ᶜ.indicator`
+      `(fun x => shiftedPolynomial n (fun m => (τ₁ n m : ℂ)) x * lowOutsidePolynomial n x) t`
+  —— 把 Stack 零占位 `b1B1_outsidePair` L6910 与上面的 F·G 外侧积分等同。
+
+`b1B1_far_weightBound`：
+  `∀ u ∈ Icc 1 (BM n),`
+    `∑ p ∈ (lowAtomSet n).filter (fun p => lowAtomStep n p = u),`
+      `‖lowAtomWeight n p‖ ≤ T * logBudget n`
+  —— 纤维集中 `W = T·logBudget n`；共享纤维 TODO。方案 (C) 下纤维单项，
+  由 inner μ-和除数界直接给（§12.1）。
+-/
+
+-- SOURCE: ref L7201; Stack skeleton `b1B1_far_le` L6924–6928.
+-- DIFF: low×low F = `shiftedPolynomial n (τ₁ n)`, G = `lowOutsidePolynomial n`;
+end
+
+end GoldbachB1B1Far
+
+
+/-!
+# Primitive segment (b1-b1 low×low): smoothed → primitive replacement cost.
+
+Port of reference `norm_smoothedNearPair_sub_primitive_le` L7487–7534 and
+`primitive_replacement_budget_le` L7854–7889.
+
+## Structure (unchanged from the high-band reference)
+
+1. Per atom `i`, the smoothed-vs-primitive difference is summed over the
+   conductor divisors `q ∈ (step i).divisors.filter (BR n < q)`; each entry
+   costs `C / step i · q`, so the divisor-count bound `tBound` folds the
+   divisor list to `C · T`.
+2. Outer weight sum `Σ_i ‖c i‖ ≤ BM n · W` (fibre concentration `W`, one
+   `T` per fibre).
+3. Budget arithmetic: `16·B₁ n·T³(1+T)·log₂ n·log n · BM n·W` closes to
+   `160·finalScale n T`; this step is pure exponent/log arithmetic and is
+   written out in full.
+
+## Low×low differences vs reference
+
+- `lowCut n → B₁ n` (L5792, `⌊n^{1/4}⌋₊`); `maximumStep n → BM n`
+  (L6302, `⌊n^{2/5}⌋₊`).
+- Exponent envelope: ref `n^{31/32}`; low×low has `B₁·BM ≤ n^{4/5} ≤ n^{23/24}`,
+  so it is absorbed by `finalScale`.
+- Per-atom kernel difference reuses Stack `norm_mangoldt_replacement_le` L4718
+  (the `ramanujan - primitiveAt` machine); the concrete atom-level wiring
+  remains the only object-level gap.
+
+## Stack anchors
+
+| Item | Stack line |
+|---|---|
+| `B₁` / `BM` / `BR` | L6081 / L6302 / L6311 |
+| `b1B1_B1_le_stepLow` | L5830 |
+| `b1B1_stepLow_le_power` | L5820 |
+| `finalScale` / `logBudget` | L6896 / L5625 |
+| `norm_mangoldt_replacement_le` | L4718 |
+| skeleton `b1B1_primitive_le` | L6936–6940 |
+-/
+
+namespace GoldbachB1B1Primitive
+
+open Finset Complex
+open scoped BigOperators
+open GoldbachB1B1 GoldbachB1B1Assembly GoldbachB1B1Adapt GoldbachB1B1Scale
+open DyadicMixedB4Geometric DyadicMixedB4ArcGeometry DyadicMixedB4EnergyTail
+open GoldbachB1B1OffWave
+
+noncomputable section
+
+-- ===========================================================================
+-- Local log helpers (self-contained; see MainBlock L142 for the same proof)
+-- ===========================================================================
+
+-- SOURCE: ref L7877 `natLog_succ_le`; DIFF: instantiated to the low band.
+theorem b1B1_prim_log_le_logBudget {n : ℕ} (hn : 1 ≤ n) :
+    Real.log n ≤ logBudget n := by
+  have h1 : Real.log n ≤ Real.log ((n : ℝ) + 2) :=
+    Real.log_le_log (by exact_mod_cast hn) (by linarith)
+  exact h1.trans (le_add_of_nonneg_right zero_le_one)
+
+-- SOURCE: ref L7877; DIFF: `Nat.log 2 m ≤ 5·logBudget n`, `m ≤ n`.
+theorem b1B1_prim_natLog_le {m n : ℕ} (nLower : 2 ≤ n) (mBound : m ≤ n) :
+    (Nat.log 2 m : ℝ) ≤ 5 * logBudget n := by
+  have hlog := b1B1_log2_le_four_log nLower
+  have hmono : (Nat.log 2 m : ℝ) ≤ Nat.log 2 (n + 2) := by
+    exact_mod_cast Nat.log_mono_right (mBound.trans (Nat.le_add_right n 2))
+  have hle : Real.log n ≤ logBudget n := b1B1_prim_log_le_logBudget (by omega)
+  have hB : 1 ≤ logBudget n := one_le_logBudget n
+  linarith only [hlog, hmono, hle, hB]
+
+-- ===========================================================================
+-- Budget arithmetic: full proof, closes to `160·finalScale n T`
+-- ===========================================================================
+
+-- SOURCE: ref L7854 `primitive_replacement_budget_le`.
+-- DIFF: `lowCut→B₁`, `maximumStep→BM`; exponent `31/32 → 23/24`
+--   (`B₁·BM ≤ n^{4/5}` since `B₁ ≤ BM` and `BM ≤ n^{2/5}`).
+--   Factor algebra:
+--     `16·B₁·T³(1+T)·log₂n·log n · BM·(T·B)`
+--     = `16·(B₁·BM)·(T⁴(1+T))·(log₂n·log n·B)`
+--     ≤ `16·n^{23/24}·(2T⁵)·(5B⁷) = 160·finalScale n T`.
+theorem b1B1_primitive_budget_le (n : ℕ) (nLower : 2 ≤ n)
+    {T : ℝ} (TLower : 1 ≤ T) :
+    (16 * (B₁ n : ℝ) * T ^ 3 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) *
+      ((BM n : ℝ) * (T * logBudget n)) ≤ 160 * finalScale n T := by
+  let B := logBudget n
+  have nPositive : 0 < n := by omega
+  have nReal : (0 : ℝ) < n := by exact_mod_cast nPositive
+  have nRealLower : 1 ≤ n := by exact_mod_cast nPositive
+  have BLower : 1 ≤ B := one_le_logBudget n
+  have BNonneg : 0 ≤ B := zero_le_one.trans BLower
+  have TNonneg : 0 ≤ T := zero_le_one.trans TLower
+  have logNonneg : 0 ≤ Real.log n := Real.log_nonneg (by exact_mod_cast nRealLower)
+  -- length: B₁·BM ≤ BM² ≤ n^{2/5}·n^{2/5} = n^{4/5} ≤ n^{23/24}.
+  have length : (B₁ n : ℝ) * (BM n : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) := by
+    have b1LeM : B₁ n ≤ BM n := b1B1_B1_le_stepLow (by omega)
+    calc
+      _ ≤ (BM n : ℝ) * (BM n : ℝ) :=
+        mul_le_mul_of_nonneg_left (by exact_mod_cast b1LeM) (Nat.cast_nonneg _)
+      _ ≤ (n : ℝ) ^ (2 / 5 : ℝ) * (n : ℝ) ^ (2 / 5 : ℝ) :=
+        mul_le_mul_of_nonneg_left (b1B1_stepLow_le_power n) (by positivity)
+      _ = (n : ℝ) ^ (4 / 5 : ℝ) := by
+        rw [← Real.rpow_add nReal]; ring
+      _ ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
+        Real.rpow_le_rpow_of_exponent_le (by exact_mod_cast nRealLower) (by norm_num)
+  -- T⁴(1+T) ≤ 2T⁵.
+  have tPow : T ^ 4 * (1 + T) ≤ 2 * T ^ 5 := by
+    calc
+      _ ≤ T ^ 4 * (2 * T) := mul_le_mul_of_nonneg_left (by linarith only [TLower]) (by positivity)
+      _ = _ := by ring
+  -- log₂ n · log n · B ≤ 5 B⁷.
+  have lPow : (Nat.log 2 n : ℝ) * Real.log n * B ≤ 5 * B ^ 7 := by
+    have h : (Nat.log 2 n : ℝ) ≤ 5 * B := b1B1_prim_natLog_le nLower le_rfl
+    have h2 : Real.log n ≤ B := b1B1_prim_log_le_logBudget (by omega)
+    calc
+      _ ≤ (5 * B) * B * B := mul_le_mul_of_nonneg_right
+        (mul_le_mul h h2 logNonneg (by positivity)) BNonneg
+      _ = 5 * B ^ 3 := by ring
+      _ ≤ _ := mul_le_mul_of_nonneg_left (pow_le_pow_right₀ BLower (by decide : 3 ≤ 7)) (by norm_num)
+  calc
+    _ = 16 * ((B₁ n : ℝ) * (BM n : ℝ)) * (T ^ 4 * (1 + T)) *
+        ((Nat.log 2 n : ℝ) * Real.log n * B) := by unfold B; ring
+    _ ≤ 16 * (n : ℝ) ^ (23 / 24 : ℝ) * (2 * T ^ 5) * (5 * B ^ 7) :=
+      mul_le_mul (mul_le_mul (mul_le_mul_of_nonneg_left length (by norm_num)) tPow
+        (by positivity) (by positivity)) lPow (by positivity) (by positivity)
+    _ = _ := by unfold finalScale B; ring
+
+-- ===========================================================================
+-- Abstract replacement bound over an item list
+-- ===========================================================================
+
+/-!
+Parameters mirror ref L7487:
+- `items` : low atom list (alternative (C): one entry per divisor-side `a`);
+- `g i`  : atom step (`a`); `c i` : atom weight (inner μ-sum · Λ b);
+- `tBound`: divisor-cardinality bound ≤ T;
+- `atomDiff`: per-atom smoothed-vs-primitive difference ≤ `C · T`, where
+  `C = 16·B₁ n·T²(1+T)·log₂n·log n`;
+- `weightBound`: per-step fibre weight concentration ≤ W.
+-/
+
+-- SOURCE: ref L7487 `norm_smoothedNearPair_sub_primitive_le`.
+-- DIFF: abstracted over `ι`/`g`/`c`; per-atom kernel difference supplied as
+--   hypothesis `atomDiff` (Stack kernel machine: `norm_mangoldt_replacement_le`
+--   L4718). Concrete smoothed/primitive near-pair objects are wired in
+--   `b1B1_primitive_le` below.
+theorem b1B1_smoothed_sub_primitive_aux {ι : Type*} (n : ℕ) (nLower : 2 ≤ n)
+    {T W : ℝ} (TLower : 1 ≤ T) (TNonneg : 0 ≤ T) (WNonneg : 0 ≤ W)
+    (items : Finset ι) (g : ι → ℕ) (c diff : ι → ℂ)
+    (stepRange : ∀ i ∈ items, g i ∈ Icc 1 (BM n))
+    (weightBound : ∀ u ∈ Icc 1 (BM n),
+      (∑ i ∈ items.filter (fun i => g i = u), ‖c i‖) ≤ W)
+    (tBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T)
+    (atomDiff : ∀ i ∈ items, ‖diff i‖ ≤
+        (16 * (B₁ n : ℝ) * T ^ 2 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) * T) :
+    ‖∑ i ∈ items, c i * diff i‖ ≤
+      (16 * (B₁ n : ℝ) * T ^ 3 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n) *
+        ((BM n : ℝ) * W) := by
+  let C : ℝ := 16 * (B₁ n : ℝ) * T ^ 2 * (1 + T) * (Nat.log 2 n : ℝ) * Real.log n
+  have CNonneg : 0 ≤ C := by unfold C; positivity
+  have inner (i : ι) (membership : i ∈ items) : ‖diff i‖ ≤ C * T :=
+    atomDiff i membership
+  refine (norm_sum_le _ _).trans ?_
+  calc
+    _ ≤ ∑ i ∈ items, ‖c i‖ * (C * T) := by
+      refine sum_le_sum fun i membership => ?_
+      rw [norm_mul]
+      exact mul_le_mul_of_nonneg_left (inner i membership) (norm_nonneg _)
+    _ = (∑ i ∈ items, ‖c i‖) * (C * T) := (sum_mul _ _ _).symm
+    _ ≤ ((BM n : ℝ) * W) * (C * T) := by
+      have totalWeight : (∑ i ∈ items, ‖c i‖) ≤ (BM n : ℝ) * W := by
+        have mapsTo : ∀ i ∈ items, g i ∈ Icc 1 (BM n) := stepRange
+        have h : (∑ i ∈ items, ‖c i‖) =
+            ∑ u ∈ Icc 1 (BM n), ∑ i ∈ items.filter (fun i => g i = u), ‖c i‖ :=
+          (sum_fiberwise_of_maps_to mapsTo (fun i => ‖c i‖)).symm
+        calc
+          (∑ i ∈ items, ‖c i‖)
+              = ∑ u ∈ Icc 1 (BM n), ∑ i ∈ items.filter (fun i => g i = u), ‖c i‖ := h
+          _ ≤ ∑ _ ∈ Icc 1 (BM n), W :=
+            sum_le_sum fun u uMember => weightBound u uMember
+          _ = (BM n : ℝ) * W := by
+            rw [sum_const, card_Icc, Nat.cast_add, Nat.cast_one, nsmul_eq_mul]
+      exact mul_le_mul_of_nonneg_right totalWeight (mul_nonneg CNonneg TNonneg)
+    _ = _ := by unfold C; ring
+
+-- ===========================================================================
+-- Concrete low×low primitive bound (replaces Stack skeleton L6936–6940)
+-- ===========================================================================
+
+-- SOURCE: ref L7487; Stack skeleton `b1B1_primitive_le` L6936–6940.
+-- DIFF: low×low atom list = `lowAtomSet n`; step/lo/hi/weight =
+--   `lowAtomStep/lowAtomLower/lowAtomUpper/lowAtomWeight n`.
+-- NEEDS (object wiring, ≤ 4):
+--   1. Per-atom conductor-level terms (smoothed − primitive, abstract `diff`
+--      in the aux) are not yet defined in Stack; kernel difference bound
+--      comes from `norm_mangoldt_replacement_le` L4718.
+--   2. Identify `b1B1_smoothedNearPair n - b1B1_primitiveNearPair n` with the
+--      `∑ i ∈ lowAtomSet n, …` aggregate in the aux lemma.
+--   3. `stepRange`: from `mem_lowAtomSet` (`p.1 ≤ B₁ n ≤ BM n`).
+--   4. `weightBound` fibre ≤ `W = T·logBudget n` — shared fibre TODO
+--      (§12; alternative (C) gives single-entry fibres).
+end
+
+end GoldbachB1B1Primitive
