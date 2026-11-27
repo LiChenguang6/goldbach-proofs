@@ -16,3 +16,4 @@ import PEqualNP.Weyl.Affine
 import PEqualNP.Weyl.BlockBound
 import PEqualNP.Weyl.Bilinear
 import PEqualNP.Weyl.BilinearBound
+import PEqualNP.Weyl.Residue
