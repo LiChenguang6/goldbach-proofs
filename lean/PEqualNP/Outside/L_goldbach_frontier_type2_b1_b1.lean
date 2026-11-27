@@ -6911,253 +6911,18 @@ def b1B1_outsidePair (n : ℕ) : ℂ := 0
 def b1B1_exactNearPair (n : ℕ) : ℂ := 0
 def b1B1_smoothedNearPair (n : ℕ) : ℂ := 0
 def b1B1_primitiveNearPair (n : ℕ) : ℂ := 0
-def b1B1_tailPair (n : ℕ) : ℂ := 0
 
-/-- Segment 1 (split): the deep pair splits into the outside pair and the
-    exact near pair. -/
-theorem b1B1_split_shifted (n : ℕ) (nLower : 2 ≤ n)
-    (width : 4 * BH n * BM n ≤ n) :
-    Jdeep n (τ₁ n) (τ₁ n) = b1B1_outsidePair n + b1B1_exactNearPair n := by
-  sorry
+/-- Prefix cutoff for the unbalanced tail: `⌊n^{3/4}⌋₊`. -/
+def b1B1_tailCutoff (n : ℕ) : ℕ := ⌊(n : ℝ) ^ (3 / 4 : ℝ)⌋₊
 
-/-- Segment 2 (far / outside): Young + offWave moment on the outside pair. -/
-theorem b1B1_far_le (n : ℕ) (nLower : 2 ≤ n)
-    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
-    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
-    ‖b1B1_outsidePair n‖ ≤ 577 * finalScale n T := by
-  sorry
+/-- Unbalanced tail prefix sum `Σ_{m ≤ ⌊n^{3/4}⌋} τ₁(n,m)·τ₁(n,n-m)`. -/
+def b1B1_tailPair (n : ℕ) : ℂ :=
+  ∑ m ∈ range (b1B1_tailCutoff n + 1),
+    (τ₁ n m : ℂ) * (τ₁ n (n - m) : ℂ)
 
-/-- Segment 3 (smoothing): near-pair replacement cost, exact → smoothed. -/
-theorem b1B1_smoothing_le (n : ℕ) (nLower : 2 ≤ n)
-    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
-    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
-    ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ ≤ 16 * finalScale n T := by
-  sorry
-
-/-- Segment 4 (primitive): smoothed → primitive replacement cost. -/
-theorem b1B1_primitive_le (n : ℕ) (nLower : 2 ≤ n)
-    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
-    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
-    ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ ≤ 160 * finalScale n T := by
-  sorry
-
-/-- Segment 5 (main): primitive near pair, gcd cross term absorbed by the
-    gcd-series constant. -/
-theorem b1B1_main_le (n : ℕ) (nLower : 2 ≤ n)
-    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
-    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
-    ‖b1B1_primitiveNearPair n‖ ≤ (10240000 * gcdSeriesConstant) * finalScale n T := by
-  sorry
-
-/-- Segment 6 (tail): unbalanced / prefix-energy tail, absorbed into the main
-    envelope (`n^(7/8+o(1))` is dominated by `n^(23/24)`). -/
-theorem b1B1_tail_le (n : ℕ) (nLower : 2 ≤ n)
-    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
-    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
-    ‖b1B1_tailPair n‖ ≤ finalScale n T := by
-  sorry
-
-/-- Assembly: combine the six segments by the triangle inequality. The six
-    segment bounds above remain the only sorry sites. -/
-theorem b1B1_deepPairIntegral_le (n : ℕ) (nLower : 2 ≤ n)
-    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
-    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
-    ‖Jdeep n (τ₁ n) (τ₁ n)‖ ≤ totalConstant * finalScale n T := by
-  have hsplit := b1B1_split_shifted n nLower width
-  have hfar := b1B1_far_le n nLower width TLower divisorBound
-  have hsmooth := b1B1_smoothing_le n nLower width TLower divisorBound
-  have hprim := b1B1_primitive_le n nLower width TLower divisorBound
-  have hmain := b1B1_main_le n nLower width TLower divisorBound
-  have htail := b1B1_tail_le n nLower width TLower divisorBound
-  have approxNorm (x y : ℂ) : ‖x‖ ≤ ‖x - y‖ + ‖y‖ := by
-    simpa only [sub_add_cancel] using norm_add_le (x - y) y
-  rw [hsplit]
-  set F := finalScale n T with hF
-  have htri : ‖b1B1_outsidePair n + b1B1_exactNearPair n‖ ≤
-      ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖ := norm_add_le _ _
-  have h1 : ‖b1B1_exactNearPair n‖ ≤
-      ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
-        ‖b1B1_smoothedNearPair n‖ :=
-    approxNorm _ _
-  have h2 : ‖b1B1_smoothedNearPair n‖ ≤
-      ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
-        ‖b1B1_primitiveNearPair n‖ :=
-    approxNorm _ _
-  have hChain : ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖ ≤
-      ‖b1B1_outsidePair n‖ +
-        ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
-          ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
-            ‖b1B1_primitiveNearPair n‖ := by
-    calc
-      ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖
-        ≤ ‖b1B1_outsidePair n‖ +
-          (‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
-            ‖b1B1_smoothedNearPair n‖) := by gcongr
-      _ = ‖b1B1_outsidePair n‖ +
-          ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
-            ‖b1B1_smoothedNearPair n‖ := by ring
-      _ ≤ ‖b1B1_outsidePair n‖ +
-          ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
-            (‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
-              ‖b1B1_primitiveNearPair n‖) := by gcongr
-      _ = _ := by ring
-  have hSum : ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖ ≤
-      (577 + 16 + 160 + 10240000 * gcdSeriesConstant) * F := by
-    have hAdd : ‖b1B1_outsidePair n‖ +
-          ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
-            ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
-              ‖b1B1_primitiveNearPair n‖ ≤
-        577 * F + 16 * F + 160 * F + (10240000 * gcdSeriesConstant) * F := by
-      have ha := add_le_add (add_le_add (add_le_add hfar hsmooth) hprim) hmain
-      simpa [mul_add, add_mul] using ha
-    have hle := hChain.trans hAdd
-    simpa [mul_add, add_mul] using hle
-  have hF : 0 ≤ F := by
-    unfold F finalScale
-    exact mul_nonneg (mul_nonneg (pow_nonneg (zero_le_one.trans TLower) 5)
-      (pow_nonneg (zero_le_one.trans (one_le_logBudget n)) 7))
-      (Real.rpow_nonneg (Nat.cast_nonneg n) _)
-  have hConst : (577 + 16 + 160 + 10240000 * gcdSeriesConstant) * F ≤
-      (776 + 10240000 * gcdSeriesConstant) * F := by
-    apply mul_le_mul_of_nonneg_right
-    · norm_num
-    · exact hF
-  unfold totalConstant
-  exact htri.trans (hSum.trans hConst)
 
 end GoldbachB1B1Assembly
 
-namespace GoldbachB1B1Finish
-
-open Finset Filter Complex
-open GoldbachB1B1 GoldbachB1B1Assembly GoldbachB1B1Divisors
-open GoldbachB1B1Adapt GoldbachB1B1Scale GoldbachB1B1GcdSeries
-open DyadicMixedB4EnergyTail
-
-/-- Eventually `logBudget n ≤ n^{1/256}` (logarithm grows slower than any positive
-    power). -/
-private theorem eventually_log_budget_le :
-    ∀ᶠ n : ℕ in Filter.atTop, logBudget n ≤ (n : ℝ) ^ (1 / 256 : ℝ) := by
-  have limit : Tendsto (fun n : ℕ => Real.log n / (n : ℝ) ^ (1 / 256 : ℝ))
-      Filter.atTop (𝓝 0) := by
-    have realLimit := (isLittleO_log_rpow_rpow_atTop (1 : ℕ)
-      (show (0 : ℝ) < 1 / 256 by norm_num)).tendsto_div_nhds_zero
-    simpa only [Real.rpow_one, Nat.cast_one, Function.comp_def] using
-      realLimit.comp (tendsto_natCast_atTop_atTop (R := ℝ))
-  filter_upwards [eventually_ge_atTop 2,
-      limit.eventually_lt_const (show (0 : ℝ) < 1 / 4 by norm_num)] with n hn small
-  have nLower : (2 : ℝ) ≤ n := by exact_mod_cast hn
-  have nPositive : (0 : ℝ) < n := by linarith only [nLower]
-  have logTwo := Real.log_le_log (by norm_num : (0 : ℝ) < 2) nLower
-  have big : (n : ℝ) + 2 ≤ (n : ℝ) ^ 2 := by
-    nlinarith only [mul_nonneg (show 0 ≤ (n : ℝ) - 2 by linarith only [nLower])
-      (show 0 ≤ (n : ℝ) + 1 by positivity)]
-  have logSquare := Real.log_le_log (by positivity : 0 < (n : ℝ) + 2) big
-  rw [Real.log_pow] at logSquare
-  norm_num at logSquare
-  have logBound : logBudget n ≤ 4 * Real.log n := by
-    unfold logBudget
-    linarith only [logSquare, logTwo, Real.log_two_gt_d9]
-  have divided := (div_lt_iff₀ (Real.rpow_pos_of_pos nPositive _)).mp small
-  exact logBound.trans (by linarith only [divided])
-
-/-- Growth envelope: for any `C ≥ 0` and `e > 0`, eventually there is `T ≥ 1`
-    bounding the divisor count such that `C · finalScale n T ≤ e · n`. -/
-theorem b1B1_eventually_finalScale_le {C e : ℝ}
-    (CNonnegative : 0 ≤ C) (ePositive : 0 < e) :
-    ∀ᶠ n : ℕ in Filter.atTop, ∃ T : ℝ, 1 ≤ T ∧
-      (∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) ∧
-        C * finalScale n T ≤ e * (n : ℝ) := by
-  obtain ⟨D, DLower, envelope⟩ := b1B1_divisor_envelope
-  let P := C * D ^ 5
-  -- `P · n^{-29/3072} → 0` atTop.
-  have limit : Tendsto (fun n : ℕ => (n : ℝ) ^ (-(29 / 3072 : ℝ)))
-      Filter.atTop (𝓝 0) :=
-    (tendsto_rpow_neg_atTop (by norm_num)).comp tendsto_natCast_atTop_atTop
-  have scaledLimit : Tendsto (fun n : ℕ => P * (n : ℝ) ^ (-(29 / 3072 : ℝ)))
-      Filter.atTop (𝓝 0) := by
-    simpa only [mul_zero] using tendsto_const_nhds.mul limit
-  filter_upwards [eventually_ge_atTop 1, eventually_log_budget_le,
-      scaledLimit.eventually_lt_const ePositive] with n nLower logBound small
-  let X := (n : ℝ) ^ (1 / 1024 : ℝ)
-  let T := D * X
-  have nOne : 1 ≤ (n : ℝ) := by exact_mod_cast nLower
-  have nPositive : (0 : ℝ) < n := zero_lt_one.trans_le nOne
-  have XLower : 1 ≤ X := Real.one_le_rpow nOne (by norm_num)
-  have TLower : 1 ≤ T := one_le_mul_of_one_le_of_one_le DLower XLower
-  refine ⟨T, TLower, fun m upper => envelope n m upper, ?_⟩
-  have hNonneg : 0 ≤ (n : ℝ) := by linarith
-  have hmulLog : ((n : ℝ) ^ (1 / 256 : ℝ)) ^ 7 = (n : ℝ) ^ (7 / 256 : ℝ) := by
-    rw [← Real.rpow_natCast, ← Real.rpow_mul hNonneg]
-    norm_num
-  have hLog7 : logBudget n ^ 7 ≤ (n : ℝ) ^ (7 / 256 : ℝ) := by
-    have h1 : 1 ≤ logBudget n := one_le_logBudget n
-    have h := pow_le_pow_left₀ (zero_le_one.trans h1) logBound 7
-    rw [hmulLog] at h
-    exact h
-  have hX5 : X ^ 5 = (n : ℝ) ^ (5 / 1024 : ℝ) := by
-    unfold X
-    rw [← Real.rpow_natCast, ← Real.rpow_mul hNonneg]
-    norm_num
-  have hExp : (n : ℝ) ^ (5 / 1024 : ℝ) * (n : ℝ) ^ (7 / 256 : ℝ) *
-      (n : ℝ) ^ (23 / 24 : ℝ) = (n : ℝ) ^ (3043 / 3072 : ℝ) := by
-    rw [← Real.rpow_add nPositive, ← Real.rpow_add nPositive]
-    norm_num
-  have hExp2 : (n : ℝ) ^ (3043 / 3072 : ℝ) =
-      (n : ℝ) ^ (-(29 / 3072 : ℝ)) * (n : ℝ) := by
-    have key := Real.rpow_add nPositive (-(29 / 3072 : ℝ)) (1 : ℝ)
-    norm_num at key ⊢
-    exact key
-  calc
-    C * finalScale n T
-      ≤ C * (T ^ 5 * (n : ℝ) ^ (7 / 256 : ℝ) * (n : ℝ) ^ (23 / 24 : ℝ)) := by
-        unfold finalScale
-        exact mul_le_mul_of_nonneg_left
-          (mul_le_mul_of_nonneg_right
-            (mul_le_mul_of_nonneg_left hLog7 (by positivity)) (by positivity))
-          CNonnegative
-    _ = C * D ^ 5 * ((n : ℝ) ^ (5 / 1024 : ℝ) * (n : ℝ) ^ (7 / 256 : ℝ) *
-          (n : ℝ) ^ (23 / 24 : ℝ)) := by
-        have hT5 : T ^ 5 = D ^ 5 * X ^ 5 := by ring
-        rw [hT5, hX5]
-        ring
-    _ = P * (n : ℝ) ^ (3043 / 3072 : ℝ) := by
-        have hP : P = C * D ^ 5 := rfl
-        rw [hP, hExp]
-    _ = P * (n : ℝ) ^ (-(29 / 3072 : ℝ)) * (n : ℝ) := by rw [hExp2]; ring
-    _ ≤ e * (n : ℝ) := mul_le_mul_of_nonneg_right small.le hNonneg
-
-/-- Frozen frontier theorem: pure quantifier assembly over the segment bounds and
-    the growth envelope. -/
-theorem b1B1_target :
-    ∀ ε : ℝ, 0 < ε → ∃ N : ℕ, ∀ n : ℕ, N ≤ n → Even n →
-      ‖Jdeep n (τ₁ n) (τ₁ n)‖ ≤ ε * (n : ℝ) := by
-  intro ε hε
-  have CNonneg : 0 ≤ totalConstant := totalConstant_nonnegative
-  have envelope := b1B1_eventually_finalScale_le CNonneg hε
-  obtain ⟨Nwidth, hwidth⟩ := b1B1_small_width_thresholded
-  obtain ⟨Nenv, hNenv⟩ := Filter.eventually_atTop.mp envelope
-  let N := max 2 (max Nwidth Nenv)
-  refine ⟨N, fun n hn _hEven => ?_⟩
-  have hGeWidth : Nwidth ≤ n := by
-    exact le_trans (le_max_left Nwidth Nenv)
-      (le_trans (le_max_right 2 (max Nwidth Nenv)) hn)
-  have hGeEnv : Nenv ≤ n := by
-    exact le_trans (le_max_right Nwidth Nenv)
-      (le_trans (le_max_right 2 (max Nwidth Nenv)) hn)
-  have hwidth' : 4 * BH n * BM n ≤ n := by
-    have hReal : ((4 * BH n * BM n : ℕ) : ℝ) ≤ n := by
-      simpa using hwidth n hGeWidth
-    exact Nat.cast_le.mp hReal
-  have hNenv' := hNenv n hGeEnv
-  obtain ⟨T, TLower, divisorBound, bound⟩ := hNenv'
-  have nLower : 2 ≤ n := by
-    have : 2 ≤ N := le_max_left _ _
-    omega
-  have main := b1B1_deepPairIntegral_le n nLower hwidth' TLower divisorBound
-  exact main.trans bound
-
-end GoldbachB1B1Finish
 
 namespace GoldbachB1B1LowCoeff
 
@@ -9089,3 +8854,289 @@ theorem b1B1_smoothed_sub_primitive_aux {ι : Type*} (n : ℕ) (nLower : 2 ≤ n
 end
 
 end GoldbachB1B1Primitive
+
+namespace GoldbachB1B1Assembly
+
+open Finset Filter
+open GoldbachB1B1
+open GoldbachB1B1Scale GoldbachB1B1Adapt
+open DyadicMixedB4EnergyTail
+open GoldbachB1B1GcdSeries
+
+/-- Segment 1 (split): the deep pair splits into the outside pair and the
+    exact near pair. -/
+theorem b1B1_split_shifted (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) :
+    Jdeep n (τ₁ n) (τ₁ n) = b1B1_outsidePair n + b1B1_exactNearPair n := by
+  sorry
+
+/-- Segment 2 (far / outside): Young + offWave moment on the outside pair. -/
+theorem b1B1_far_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_outsidePair n‖ ≤ 577 * finalScale n T := by
+  sorry
+
+/-- Segment 3 (smoothing): near-pair replacement cost, exact → smoothed. -/
+theorem b1B1_smoothing_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ ≤ 16 * finalScale n T := by
+  sorry
+
+/-- Segment 4 (primitive): smoothed → primitive replacement cost. -/
+theorem b1B1_primitive_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ ≤ 160 * finalScale n T := by
+  sorry
+
+/-- Segment 5 (main): primitive near pair, gcd cross term absorbed by the
+    gcd-series constant. -/
+theorem b1B1_main_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_primitiveNearPair n‖ ≤ (10240000 * gcdSeriesConstant) * finalScale n T := by
+  sorry
+
+/-- Segment 6 (tail): unbalanced / prefix-energy tail, absorbed into the main
+    envelope (`n^(7/8+o(1))` is dominated by `n^(23/24)`). -/
+theorem b1B1_tail_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖b1B1_tailPair n‖ ≤ 8 * finalScale n T := by
+  set x := b1B1_tailCutoff n with hxDef
+  have nOne : 1 ≤ (n : ℝ) := Nat.one_le_cast.mpr (by omega)
+  have TNonneg : 0 ≤ T := zero_le_one.trans TLower
+  have hxpow : (x : ℝ) ≤ (n : ℝ) ^ (3 / 4 : ℝ) := Nat.floor_le (by positivity)
+  have hx : x ≤ n := by
+    have hLe : (n : ℝ) ^ (3 / 4 : ℝ) ≤ (n : ℝ) :=
+      Real.rpow_le_self_of_one_le nOne (by norm_num)
+    exact Nat.floor_le_of_le hLe
+  have hUnbal : ‖b1B1_tailPair n‖ ≤
+      8 * T ^ 4 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by
+    unfold b1B1_tailPair
+    exact GoldbachB1B1Tail.b1B1_unbalanced_tail_le n nLower TNonneg divisorBound x hx hxpow
+  have hB : 1 ≤ logBudget n := one_le_logBudget n
+  have tPow : T ^ 4 ≤ T ^ 5 := pow_le_pow_right₀ TLower (by decide : 4 ≤ 5)
+  have bPow : logBudget n ^ 2 ≤ logBudget n ^ 7 :=
+    pow_le_pow_right₀ hB (by decide : 2 ≤ 7)
+  have ePow : (n : ℝ) ^ (7 / 8 : ℝ) ≤ (n : ℝ) ^ (23 / 24 : ℝ) :=
+    Real.rpow_le_rpow_of_exponent_le nOne (by norm_num)
+  have hMain : 8 * T ^ 4 * logBudget n ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) ≤
+      8 * T ^ 5 * logBudget n ^ 7 * (n : ℝ) ^ (23 / 24 : ℝ) := by
+    gcongr
+  calc
+    ‖b1B1_tailPair n‖
+      ≤ 8 * T ^ 4 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := hUnbal
+    _ = 8 * T ^ 4 * logBudget n ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by
+      unfold logBudget; ring
+    _ ≤ 8 * T ^ 5 * logBudget n ^ 7 * (n : ℝ) ^ (23 / 24 : ℝ) := hMain
+    _ = 8 * finalScale n T := by unfold finalScale; ring
+
+/-- Assembly: combine the six segments by the triangle inequality. The six
+    segment bounds above remain the only sorry sites. -/
+theorem b1B1_deepPairIntegral_le (n : ℕ) (nLower : 2 ≤ n)
+    (width : 4 * BH n * BM n ≤ n) {T : ℝ} (TLower : 1 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ‖Jdeep n (τ₁ n) (τ₁ n)‖ ≤ totalConstant * finalScale n T := by
+  have hsplit := b1B1_split_shifted n nLower width
+  have hfar := b1B1_far_le n nLower width TLower divisorBound
+  have hsmooth := b1B1_smoothing_le n nLower width TLower divisorBound
+  have hprim := b1B1_primitive_le n nLower width TLower divisorBound
+  have hmain := b1B1_main_le n nLower width TLower divisorBound
+  have htail := b1B1_tail_le n nLower width TLower divisorBound
+  have approxNorm (x y : ℂ) : ‖x‖ ≤ ‖x - y‖ + ‖y‖ := by
+    simpa only [sub_add_cancel] using norm_add_le (x - y) y
+  rw [hsplit]
+  set F := finalScale n T with hF
+  have htri : ‖b1B1_outsidePair n + b1B1_exactNearPair n‖ ≤
+      ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖ := norm_add_le _ _
+  have h1 : ‖b1B1_exactNearPair n‖ ≤
+      ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
+        ‖b1B1_smoothedNearPair n‖ :=
+    approxNorm _ _
+  have h2 : ‖b1B1_smoothedNearPair n‖ ≤
+      ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
+        ‖b1B1_primitiveNearPair n‖ :=
+    approxNorm _ _
+  have hChain : ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖ ≤
+      ‖b1B1_outsidePair n‖ +
+        ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
+          ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
+            ‖b1B1_primitiveNearPair n‖ + ‖b1B1_tailPair n‖ := by
+    calc
+      ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖
+        ≤ ‖b1B1_outsidePair n‖ +
+          (‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
+            ‖b1B1_smoothedNearPair n‖) := by gcongr
+      _ = ‖b1B1_outsidePair n‖ +
+          ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
+            ‖b1B1_smoothedNearPair n‖ := by ring
+      _ ≤ ‖b1B1_outsidePair n‖ +
+          ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
+            (‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
+              ‖b1B1_primitiveNearPair n‖) := by gcongr
+      _ = ‖b1B1_outsidePair n‖ +
+          ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
+            ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
+              ‖b1B1_primitiveNearPair n‖ := by ring
+      _ ≤ _ + ‖b1B1_tailPair n‖ := by
+        exact le_add_of_nonneg_right (norm_nonneg _)
+  have hSum : ‖b1B1_outsidePair n‖ + ‖b1B1_exactNearPair n‖ ≤
+      (577 + 16 + 160 + 8 + 10240000 * gcdSeriesConstant) * F := by
+    have hAdd : ‖b1B1_outsidePair n‖ +
+          ‖b1B1_exactNearPair n - b1B1_smoothedNearPair n‖ +
+            ‖b1B1_smoothedNearPair n - b1B1_primitiveNearPair n‖ +
+              ‖b1B1_primitiveNearPair n‖ + ‖b1B1_tailPair n‖ ≤
+        577 * F + 16 * F + 160 * F + 8 * F + (10240000 * gcdSeriesConstant) * F := by
+      have ha :=
+        add_le_add (add_le_add (add_le_add (add_le_add hfar hsmooth) hprim) hmain) htail
+      linarith [ha]
+    have hle := hChain.trans hAdd
+    simpa [mul_add, add_mul] using hle
+  have hF : 0 ≤ F := by
+    unfold F finalScale
+    exact mul_nonneg (mul_nonneg (pow_nonneg (zero_le_one.trans TLower) 5)
+      (pow_nonneg (zero_le_one.trans (one_le_logBudget n)) 7))
+      (Real.rpow_nonneg (Nat.cast_nonneg n) _)
+  have hConst : (577 + 16 + 160 + 8 + 10240000 * gcdSeriesConstant) * F ≤
+      (776 + 10240000 * gcdSeriesConstant) * F := by
+    apply mul_le_mul_of_nonneg_right
+    · norm_num
+    · exact hF
+  unfold totalConstant
+  exact htri.trans (hSum.trans hConst)
+end GoldbachB1B1Assembly
+
+namespace GoldbachB1B1Finish
+
+open Finset Filter Complex
+open GoldbachB1B1 GoldbachB1B1Assembly GoldbachB1B1Divisors
+open GoldbachB1B1Adapt GoldbachB1B1Scale GoldbachB1B1GcdSeries
+open DyadicMixedB4EnergyTail
+
+/-- Eventually `logBudget n ≤ n^{1/256}` (logarithm grows slower than any positive
+    power). -/
+private theorem eventually_log_budget_le :
+    ∀ᶠ n : ℕ in Filter.atTop, logBudget n ≤ (n : ℝ) ^ (1 / 256 : ℝ) := by
+  have limit : Tendsto (fun n : ℕ => Real.log n / (n : ℝ) ^ (1 / 256 : ℝ))
+      Filter.atTop (𝓝 0) := by
+    have realLimit := (isLittleO_log_rpow_rpow_atTop (1 : ℕ)
+      (show (0 : ℝ) < 1 / 256 by norm_num)).tendsto_div_nhds_zero
+    simpa only [Real.rpow_one, Nat.cast_one, Function.comp_def] using
+      realLimit.comp (tendsto_natCast_atTop_atTop (R := ℝ))
+  filter_upwards [eventually_ge_atTop 2,
+      limit.eventually_lt_const (show (0 : ℝ) < 1 / 4 by norm_num)] with n hn small
+  have nLower : (2 : ℝ) ≤ n := by exact_mod_cast hn
+  have nPositive : (0 : ℝ) < n := by linarith only [nLower]
+  have logTwo := Real.log_le_log (by norm_num : (0 : ℝ) < 2) nLower
+  have big : (n : ℝ) + 2 ≤ (n : ℝ) ^ 2 := by
+    nlinarith only [mul_nonneg (show 0 ≤ (n : ℝ) - 2 by linarith only [nLower])
+      (show 0 ≤ (n : ℝ) + 1 by positivity)]
+  have logSquare := Real.log_le_log (by positivity : 0 < (n : ℝ) + 2) big
+  rw [Real.log_pow] at logSquare
+  norm_num at logSquare
+  have logBound : logBudget n ≤ 4 * Real.log n := by
+    unfold logBudget
+    linarith only [logSquare, logTwo, Real.log_two_gt_d9]
+  have divided := (div_lt_iff₀ (Real.rpow_pos_of_pos nPositive _)).mp small
+  exact logBound.trans (by linarith only [divided])
+
+/-- Growth envelope: for any `C ≥ 0` and `e > 0`, eventually there is `T ≥ 1`
+    bounding the divisor count such that `C · finalScale n T ≤ e · n`. -/
+theorem b1B1_eventually_finalScale_le {C e : ℝ}
+    (CNonnegative : 0 ≤ C) (ePositive : 0 < e) :
+    ∀ᶠ n : ℕ in Filter.atTop, ∃ T : ℝ, 1 ≤ T ∧
+      (∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) ∧
+        C * finalScale n T ≤ e * (n : ℝ) := by
+  obtain ⟨D, DLower, envelope⟩ := b1B1_divisor_envelope
+  let P := C * D ^ 5
+  -- `P · n^{-29/3072} → 0` atTop.
+  have limit : Tendsto (fun n : ℕ => (n : ℝ) ^ (-(29 / 3072 : ℝ)))
+      Filter.atTop (𝓝 0) :=
+    (tendsto_rpow_neg_atTop (by norm_num)).comp tendsto_natCast_atTop_atTop
+  have scaledLimit : Tendsto (fun n : ℕ => P * (n : ℝ) ^ (-(29 / 3072 : ℝ)))
+      Filter.atTop (𝓝 0) := by
+    simpa only [mul_zero] using tendsto_const_nhds.mul limit
+  filter_upwards [eventually_ge_atTop 1, eventually_log_budget_le,
+      scaledLimit.eventually_lt_const ePositive] with n nLower logBound small
+  let X := (n : ℝ) ^ (1 / 1024 : ℝ)
+  let T := D * X
+  have nOne : 1 ≤ (n : ℝ) := by exact_mod_cast nLower
+  have nPositive : (0 : ℝ) < n := zero_lt_one.trans_le nOne
+  have XLower : 1 ≤ X := Real.one_le_rpow nOne (by norm_num)
+  have TLower : 1 ≤ T := one_le_mul_of_one_le_of_one_le DLower XLower
+  refine ⟨T, TLower, fun m upper => envelope n m upper, ?_⟩
+  have hNonneg : 0 ≤ (n : ℝ) := by linarith
+  have hmulLog : ((n : ℝ) ^ (1 / 256 : ℝ)) ^ 7 = (n : ℝ) ^ (7 / 256 : ℝ) := by
+    rw [← Real.rpow_natCast, ← Real.rpow_mul hNonneg]
+    norm_num
+  have hLog7 : logBudget n ^ 7 ≤ (n : ℝ) ^ (7 / 256 : ℝ) := by
+    have h1 : 1 ≤ logBudget n := one_le_logBudget n
+    have h := pow_le_pow_left₀ (zero_le_one.trans h1) logBound 7
+    rw [hmulLog] at h
+    exact h
+  have hX5 : X ^ 5 = (n : ℝ) ^ (5 / 1024 : ℝ) := by
+    unfold X
+    rw [← Real.rpow_natCast, ← Real.rpow_mul hNonneg]
+    norm_num
+  have hExp : (n : ℝ) ^ (5 / 1024 : ℝ) * (n : ℝ) ^ (7 / 256 : ℝ) *
+      (n : ℝ) ^ (23 / 24 : ℝ) = (n : ℝ) ^ (3043 / 3072 : ℝ) := by
+    rw [← Real.rpow_add nPositive, ← Real.rpow_add nPositive]
+    norm_num
+  have hExp2 : (n : ℝ) ^ (3043 / 3072 : ℝ) =
+      (n : ℝ) ^ (-(29 / 3072 : ℝ)) * (n : ℝ) := by
+    have key := Real.rpow_add nPositive (-(29 / 3072 : ℝ)) (1 : ℝ)
+    norm_num at key ⊢
+    exact key
+  calc
+    C * finalScale n T
+      ≤ C * (T ^ 5 * (n : ℝ) ^ (7 / 256 : ℝ) * (n : ℝ) ^ (23 / 24 : ℝ)) := by
+        unfold finalScale
+        exact mul_le_mul_of_nonneg_left
+          (mul_le_mul_of_nonneg_right
+            (mul_le_mul_of_nonneg_left hLog7 (by positivity)) (by positivity))
+          CNonnegative
+    _ = C * D ^ 5 * ((n : ℝ) ^ (5 / 1024 : ℝ) * (n : ℝ) ^ (7 / 256 : ℝ) *
+          (n : ℝ) ^ (23 / 24 : ℝ)) := by
+        have hT5 : T ^ 5 = D ^ 5 * X ^ 5 := by ring
+        rw [hT5, hX5]
+        ring
+    _ = P * (n : ℝ) ^ (3043 / 3072 : ℝ) := by
+        have hP : P = C * D ^ 5 := rfl
+        rw [hP, hExp]
+    _ = P * (n : ℝ) ^ (-(29 / 3072 : ℝ)) * (n : ℝ) := by rw [hExp2]; ring
+    _ ≤ e * (n : ℝ) := mul_le_mul_of_nonneg_right small.le hNonneg
+
+/-- Frozen frontier theorem: pure quantifier assembly over the segment bounds and
+    the growth envelope. -/
+theorem b1B1_target :
+    ∀ ε : ℝ, 0 < ε → ∃ N : ℕ, ∀ n : ℕ, N ≤ n → Even n →
+      ‖Jdeep n (τ₁ n) (τ₁ n)‖ ≤ ε * (n : ℝ) := by
+  intro ε hε
+  have CNonneg : 0 ≤ totalConstant := totalConstant_nonnegative
+  have envelope := b1B1_eventually_finalScale_le CNonneg hε
+  obtain ⟨Nwidth, hwidth⟩ := b1B1_small_width_thresholded
+  obtain ⟨Nenv, hNenv⟩ := Filter.eventually_atTop.mp envelope
+  let N := max 2 (max Nwidth Nenv)
+  refine ⟨N, fun n hn _hEven => ?_⟩
+  have hGeWidth : Nwidth ≤ n := by
+    exact le_trans (le_max_left Nwidth Nenv)
+      (le_trans (le_max_right 2 (max Nwidth Nenv)) hn)
+  have hGeEnv : Nenv ≤ n := by
+    exact le_trans (le_max_right Nwidth Nenv)
+      (le_trans (le_max_right 2 (max Nwidth Nenv)) hn)
+  have hwidth' : 4 * BH n * BM n ≤ n := by
+    have hReal : ((4 * BH n * BM n : ℕ) : ℝ) ≤ n := by
+      simpa using hwidth n hGeWidth
+    exact Nat.cast_le.mp hReal
+  have hNenv' := hNenv n hGeEnv
+  obtain ⟨T, TLower, divisorBound, bound⟩ := hNenv'
+  have nLower : 2 ≤ n := by
+    have : 2 ≤ N := le_max_left _ _
+    omega
+  have main := b1B1_deepPairIntegral_le n nLower hwidth' TLower divisorBound
+  exact main.trans bound
+
+end GoldbachB1B1Finish
