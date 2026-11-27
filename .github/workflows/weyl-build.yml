@@ -3,6 +3,7 @@
 # `PEqualNP.Weyl` modules on a runner so the heavy Mathlib build happens in
 # the cloud instead of on a local machine.
 name: weyl-build
+# retrigger marker: library now includes Bilinear, BilinearBound, Residue
 
 on:
   push:
