@@ -5866,6 +5866,68 @@ theorem b1B1_radiusLow_le_half {M : ℕ} (hM : 1 ≤ M) :
     nlinarith
   exact one_div_le_one_div_of_le (by positivity) hDen
 
+/-- D1 radius arithmetic: `g · radius M ≤ 1/2` when `g ≤ M` and `M ≥ 1`. -/
+theorem b1B1_radiusLow_mul_le_half {M g : ℕ} (hM : 1 ≤ M) (hg : g ≤ M) :
+    (g : ℝ) * b1B1_radiusLow M ≤ 1 / 2 := by
+  have hg' : (g : ℝ) ≤ (M : ℝ) := by exact_mod_cast hg
+  have hM' : 1 ≤ (M : ℝ) := by exact_mod_cast hM
+  have hr : 0 ≤ b1B1_radiusLow M := by unfold b1B1_radiusLow; positivity
+  calc (g : ℝ) * b1B1_radiusLow M
+    ≤ (M : ℝ) * b1B1_radiusLow M := mul_le_mul_of_nonneg_right hg' hr
+    _ = (M : ℝ) / (8 * (M : ℝ) ^ 2) := by unfold b1B1_radiusLow; ring
+    _ = 1 / (8 * (M : ℝ)) := by field_simp
+    _ ≤ 1 / 2 := by
+      have hDen : 2 ≤ 8 * (M : ℝ) := by linarith
+      exact one_div_le_one_div_of_le (by positivity) hDen
+
+/-- Generic division-square-root bound: `n / √b ≤ 2·n^{1-a}`
+    given the lower cover `n^{2a}/4 ≤ b`. Port of B1B4 `div_sqrt_le_power`. -/
+theorem b1B1_div_sqrt_le_power (n b : ℕ) (nPositive : 0 < n) (bPositive : 0 < b)
+    (a : ℝ) (lower : (n : ℝ) ^ (2 * a) / 4 ≤ (b : ℝ)) :
+    (n : ℝ) / Real.sqrt b ≤ 2 * (n : ℝ) ^ (1 - a) := by
+  have nReal : (0 : ℝ) < n := by exact_mod_cast nPositive
+  have bReal : (0 : ℝ) < b := by exact_mod_cast bPositive
+  have rootLower : (n : ℝ) ^ a / 2 ≤ Real.sqrt b := by
+    calc
+      _ = Real.sqrt (((n : ℝ) ^ a / 2) ^ 2) := (Real.sqrt_sq (by positivity)).symm
+      _ ≤ _ := by
+        apply Real.sqrt_le_sqrt
+        rw [div_pow, ← Real.rpow_natCast, ← Real.rpow_mul nReal.le, mul_comm a,
+          show (↑(2 : ℕ) : ℝ) = 2 by norm_cast]
+        norm_num
+        exact lower
+  apply (div_le_iff₀ (Real.sqrt_pos_of_pos bReal)).mpr
+  calc
+    _ = 2 * (n : ℝ) ^ (1 - a) * ((n : ℝ) ^ a / 2) := by
+      have product := (Real.rpow_add nReal (1 - a) a).symm
+      rw [sub_add_cancel, Real.rpow_one] at product
+      calc
+        _ = (n : ℝ) ^ (1 - a) * (n : ℝ) ^ a := product.symm
+        _ = _ := by ring
+    _ ≤ _ := mul_le_mul_of_nonneg_left rootLower (by positivity)
+
+/-- Short dyad large-y bound: `A ≤ √(n/A)` from `A ≤ ⌊n^{1/4}⌋₊`.
+    Port of B1B4 `short_dyad_yLarge`. -/
+theorem b1B1_short_dyad_yLarge {n A : ℕ} (aPositive : 0 < A)
+    (aUpper : A ≤ b1B1_B1 n) :
+    (A : ℝ) ≤ Real.sqrt (n / A : ℕ) := by
+  have aLower : (1 : ℝ) ≤ A := by exact_mod_cast aPositive
+  have aRealUpper : (A : ℝ) ≤ (n : ℝ) ^ (1 / 4 : ℝ) := by
+    exact (show (A : ℝ) ≤ (⌊(n : ℝ) ^ (1 / 4 : ℝ)⌋₊ : ℝ) by exact_mod_cast aUpper).trans
+      (Nat.floor_le (by positivity))
+  have fourth : (A : ℝ) ^ 4 ≤ (n : ℝ) := by
+    refine (pow_le_pow_left₀ (Nat.cast_nonneg _) aRealUpper 4).trans_eq ?_
+    rw [← Real.rpow_natCast, ← Real.rpow_mul (Nat.cast_nonneg _)]
+    norm_num
+  have cube : (A : ℝ) ^ 3 ≤ (n : ℝ) :=
+    (pow_le_pow_right₀ aLower (by decide : 3 ≤ 4)).trans fourth
+  have div : A ^ 2 ≤ n / A := by
+    apply (Nat.le_div_iff_mul_le aPositive).mpr
+    rw [← pow_succ]
+    exact_mod_cast cube
+  have rdiv : (A : ℝ) ^ 2 ≤ (n / A : ℕ) := by exact_mod_cast div
+  exact (Real.sqrt_sq (Nat.cast_nonneg _)).symm.trans_le (Real.sqrt_le_sqrt rdiv)
+
 /-- log₂(n+2) ≤ 4 log n (port of B1B4 `log2_le_four_log`, L5824). -/
 theorem b1B1_log2_le_four_log {n : ℕ} (hn : 2 ≤ n) :
     (Nat.log 2 (n + 2) : ℝ) ≤ 4 * Real.log n := by
@@ -9007,6 +9069,48 @@ theorem b1B1_deepPairIntegral_le (n : ℕ) (nLower : 2 ≤ n)
     · exact hF
   unfold totalConstant
   exact htri.trans (hSum.trans hConst)
+
+/-- Tail-shape scale envelope: `tailShape n A M R ≤ 5·n^{31/32}`.
+    Port of B1B4 `tailShape_scale_le`; the low-band re-budget to the `23/24`
+    main envelope is applied at the consumption/budget layer, not here. -/
+theorem b1B1_tailShape_scale_le {n A : ℕ} (nPositive : 0 < n) (aPositive : 0 < A)
+    (uLower : U n < 2 * A) :
+    DyadicMixedB4EnergyTail.tailShape n A (BM n) (BR n) ≤ 5 * (n : ℝ) ^ (31 / 32 : ℝ) := by
+  have nLower : (1 : ℝ) ≤ n := by exact_mod_cast nPositive
+  have nReal : (0 : ℝ) < n := by exact_mod_cast nPositive
+  have aPos' : 0 < A := aPositive
+  have uReal : (U n : ℝ) ≤ 2 * (A : ℝ) := by exact_mod_cast uLower.le
+  have lowerU : (n : ℝ) ^ (1 / 16 : ℝ) / 2 ≤ U n :=
+    b1B1_floor_half_le (Real.one_le_rpow nLower (by norm_num))
+  have lowerR : (n : ℝ) ^ (1 / 12 : ℝ) / 2 ≤ BR n :=
+    b1B1_floor_half_le (Real.one_le_rpow nLower (by norm_num))
+  have rPos : 0 < BR n := by
+    have h1 : 1 ≤ n := by exact_mod_cast nPositive
+    have h2 : (1 : ℝ) ≤ (n : ℝ) ^ (1 / 12 : ℝ) :=
+      Real.one_le_rpow (by exact_mod_cast h1) (by norm_num)
+    have h3 : 1 ≤ ⌊(n : ℝ) ^ (1 / 12 : ℝ)⌋₊ := Nat.le_floor (n := 1) h2
+    exact_mod_cast h3
+  have first : (n : ℝ) / Real.sqrt (BR n) ≤ 2 * (n : ℝ) ^ (31 / 32 : ℝ) := by
+    refine (b1B1_div_sqrt_le_power n (BR n) nPositive rPos (1 / 24) ?_).trans ?_
+    · rw [show (2 : ℝ) * (1 / 24) = 1 / 12 by norm_num]
+      linarith only [lowerR, Real.rpow_nonneg nReal.le (1 / 12 : ℝ)]
+    · exact mul_le_mul_of_nonneg_left
+        (Real.rpow_le_rpow_of_exponent_le nLower (by norm_num)) (by norm_num)
+  have second : (n : ℝ) / Real.sqrt (A : ℝ) ≤ 2 * (n : ℝ) ^ (31 / 32 : ℝ) := by
+    simpa only [show (1 : ℝ) - 1 / 32 = 31 / 32 by norm_num] using
+      (b1B1_div_sqrt_le_power n A nPositive aPos' (1 / 32) (by
+        rw [show (2 : ℝ) * (1 / 32) = 1 / 16 by norm_num]
+        linarith only [uReal, lowerU]))
+  have third : Real.sqrt (n : ℝ) * (BM n : ℝ) ≤ (n : ℝ) ^ (31 / 32 : ℝ) := by
+    calc
+      _ ≤ Real.sqrt (n : ℝ) * (n : ℝ) ^ (2 / 5 : ℝ) :=
+        mul_le_mul_of_nonneg_left (b1B1_stepLow_le_power n) (Real.sqrt_nonneg _)
+      _ ≤ _ := by
+        rw [Real.sqrt_eq_rpow, ← Real.rpow_add nReal]
+        exact Real.rpow_le_rpow_of_exponent_le nLower (by norm_num)
+  simp only [DyadicMixedB4EnergyTail.tailShape]
+  linarith only [first, second, third]
+
 end GoldbachB1B1Assembly
 
 namespace GoldbachB1B1Finish
