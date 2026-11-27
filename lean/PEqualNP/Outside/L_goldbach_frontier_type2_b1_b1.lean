@@ -8518,12 +8518,12 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
     (tailBound : ∑ g ∈ Icc 1 (2 * A), ∑ d ∈ Icc 1 M, ∑ f ∈ n.divisors,
         tailWeight R g f d * blockEnergy n A U g d ≤
         51200 * gcdSeriesConstant * T ^ 2 * logBudget n ^ 3 *
-          (n : ℝ) ^ (31 / 32 : ℝ)) :
+          (n : ℝ) ^ (23 / 24 : ℝ)) :
     ‖∑ i ∈ items, weight i *
         ∑ q ∈ (step i).divisors.filter (fun q => R < q),
           primitiveBlock n M B H q (step i) lo hi U indices w‖ ≤
       2048000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 6 *
-        (n : ℝ) ^ (31 / 32 : ℝ) := by
+        (n : ℝ) ^ (23 / 24 : ℝ) := by
   let G := Icc 1 (2 * A)
   let D := Icc 1 M
   let F := n.divisors
@@ -8581,7 +8581,7 @@ theorem b1B1_primitiveDyadPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
       exact mul_le_mul_of_nonneg_left mainBound CNonnegative
     _ ≤ (40 * T ^ 2 * logBudget n) * ((W * logBudget n) *
         (51200 * gcdSeriesConstant * T ^ 2 * logBudget n ^ 3 *
-          (n : ℝ) ^ (31 / 32 : ℝ))) := by
+          (n : ℝ) ^ (23 / 24 : ℝ))) := by
       have logPlus : Real.log ((n : ℝ) + 1) ≤ logBudget n := by
         have h1 : Real.log ((n : ℝ) + 1) ≤ Real.log ((n : ℝ) + 2) :=
           Real.log_le_log (by linarith) (by linarith)
@@ -8614,12 +8614,12 @@ theorem b1B1_primitiveNearPair_le_aux {n : ℕ} (nLower : 2 ≤ n)
     {T : ℝ} (TNonnegative : 0 ≤ T) (nearPair : ℕ → ℂ)
     (dyadBound : ∀ k ∈ b1B1_dyadicIndices n,
         ‖nearPair k‖ ≤ 2048000 * gcdSeriesConstant * T ^ 5 *
-          logBudget n ^ 6 * (n : ℝ) ^ (31 / 32 : ℝ)) :
+          logBudget n ^ 6 * (n : ℝ) ^ (23 / 24 : ℝ)) :
     ‖∑ k ∈ b1B1_dyadicIndices n, nearPair k‖ ≤
       10240000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 7 *
-        (n : ℝ) ^ (31 / 32 : ℝ) := by
+        (n : ℝ) ^ (23 / 24 : ℝ) := by
   let C := 2048000 * gcdSeriesConstant * T ^ 5 * logBudget n ^ 6 *
-    (n : ℝ) ^ (31 / 32 : ℝ)
+    (n : ℝ) ^ (23 / 24 : ℝ)
   have logNonnegative : 0 ≤ logBudget n :=
     zero_le_one.trans (one_le_logBudget n)
   have CNonnegative : 0 ≤ C := by
