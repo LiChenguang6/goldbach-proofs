@@ -7936,16 +7936,69 @@ theorem b1B1_unbalanced_tail_le (n : ℕ) (hn : 2 ≤ n) {T : ℝ} (TNonneg : 0 
     (x : ℕ) (hx : x ≤ n) (hxpow : (x : ℝ) ≤ (n : ℝ) ^ (3 / 4 : ℝ)) :
     ‖∑ m ∈ range (x + 1), (τ₁ n m : ℂ) * (τ₁ n (n - m) : ℂ)‖ ≤
       8 * T ^ 4 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by
-  sorry
-  -- TODO: 双侧二阶矩 Σ|τ₁|² ≤ T⁴·logBudget²·x（小端）与 ≤ T⁴·logBudget²·n
-  --       （大端）的包络——本格唯一新估计。
-  --  1. 大端二阶矩：不能再走 b1-b4 的 highAtoms 枚举；需经 Parseval /
-  --     offWave L² 机器（far 段 `intervalIntegrable_offWave_norm_sq` L6467、
-  --     `offWave_mass_le_weighted` L6569）给出 `Σ_{k≤n}|τ₁|² ≤ n·T⁴·logBudget²`。
-  --  2. C-S 配对：小端矩根 √(x+1) 与大端矩根 √n 相乘，常数取 8，
-  --     对数幂 k=2。
-  --  3. 指数折算：`x ≤ n^{3/4}` ⇒ `√x·√n ≤ n^{7/8}`，核验被 main
-  --     `finalScale` 的 `n^{23/24}` 吸收（7/8 = 0.875 < 23/24 ≈ 0.9583）。
+  -- Elementary termwise L∞ × count (no Parseval / offWave L² machine):
+  -- each factor ≤ T²·B, so each product ≤ T⁴·B²; the (x+1) terms give the
+  -- crude moment `(x+1)·T⁴·B²`, then `x ≤ n^{3/4}` folds the count into
+  -- `8·n^{7/8}`. Exponent 7/8 < 23/24 leaves margin for `finalScale`.
+  have nPositive : 0 < n := by omega
+  have nOne : 1 ≤ (n : ℝ) := Nat.one_le_cast.mpr (by omega)
+  have hB0 : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
+  have hT2B : 0 ≤ T ^ 2 * logBudget n := mul_nonneg (pow_nonneg TNonneg 2) hB0
+  have hPoint : ∀ m ∈ range (x + 1),
+      ‖(τ₁ n m : ℂ) * (τ₁ n (n - m) : ℂ)‖ ≤ T ^ 4 * logBudget n ^ 2 := by
+    intro m hm
+    have mLeX : m ≤ x := by
+      have : m < x + 1 := Finset.mem_range.mp hm
+      omega
+    have mLeN : m ≤ n := mLeX.trans hx
+    have nmLeN : n - m ≤ n := by omega
+    have h1 : |τ₁ n m| ≤ T ^ 2 * logBudget n :=
+      b1B1_tau1_inf_le n m mLeN nPositive divisorBound
+    have h2 : |τ₁ n (n - m)| ≤ T ^ 2 * logBudget n :=
+      b1B1_tau1_inf_le n (n - m) nmLeN nPositive divisorBound
+    have h1c : ‖(τ₁ n m : ℂ)‖ ≤ T ^ 2 * logBudget n := by simpa using h1
+    have h2c : ‖(τ₁ n (n - m) : ℂ)‖ ≤ T ^ 2 * logBudget n := by simpa using h2
+    rw [norm_mul]
+    calc
+      ‖(τ₁ n m : ℂ)‖ * ‖(τ₁ n (n - m) : ℂ)‖
+        ≤ (T ^ 2 * logBudget n) * ‖(τ₁ n (n - m) : ℂ)‖ :=
+        mul_le_mul_of_nonneg_right h1c (norm_nonneg _)
+      _ ≤ (T ^ 2 * logBudget n) * (T ^ 2 * logBudget n) :=
+        mul_le_mul_of_nonneg_left h2c hT2B
+      _ = T ^ 4 * logBudget n ^ 2 := by ring
+  have hSum : ‖∑ m ∈ range (x + 1), (τ₁ n m : ℂ) * (τ₁ n (n - m) : ℂ)‖ ≤
+      ∑ m ∈ range (x + 1), T ^ 4 * logBudget n ^ 2 := by
+    refine (norm_sum_le _ _).trans ?_
+    exact Finset.sum_le_sum hPoint
+  have hConst : ∑ m ∈ range (x + 1), T ^ 4 * logBudget n ^ 2 =
+      ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 := by
+    rw [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+    push_cast
+    ring
+  have hx1 : (x : ℝ) + 1 ≤ 2 * (n : ℝ) ^ (3 / 4 : ℝ) := by
+    have hNpow : 1 ≤ (n : ℝ) ^ (3 / 4 : ℝ) := Real.one_le_rpow nOne (by norm_num)
+    linarith [hxpow]
+  have hExp : (n : ℝ) ^ (3 / 4 : ℝ) ≤ (n : ℝ) ^ (7 / 8 : ℝ) :=
+    Real.rpow_le_rpow_of_exponent_le nOne (by norm_num)
+  have hCount2 : 2 * (n : ℝ) ^ (3 / 4 : ℝ) ≤ 8 * (n : ℝ) ^ (7 / 8 : ℝ) := by
+    have hNN : 0 ≤ (n : ℝ) ^ (7 / 8 : ℝ) := Real.rpow_nonneg (Nat.cast_nonneg n) _
+    nlinarith
+  have hCount : (x : ℝ) + 1 ≤ 8 * (n : ℝ) ^ (7 / 8 : ℝ) := hx1.trans hCount2
+  have hT4 : 0 ≤ T ^ 4 := by positivity
+  have hMulT : ((x : ℝ) + 1) * T ^ 4 ≤ 8 * (n : ℝ) ^ (7 / 8 : ℝ) * T ^ 4 :=
+    mul_le_mul_of_nonneg_right hCount hT4
+  have hB2 : 0 ≤ logBudget n ^ 2 := pow_nonneg hB0 2
+  have hMulB : ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 ≤
+      (8 * (n : ℝ) ^ (7 / 8 : ℝ) * T ^ 4) * logBudget n ^ 2 :=
+    mul_le_mul_of_nonneg_right hMulT hB2
+  calc
+    ‖∑ m ∈ range (x + 1), (τ₁ n m : ℂ) * (τ₁ n (n - m) : ℂ)‖
+      ≤ ∑ m ∈ range (x + 1), T ^ 4 * logBudget n ^ 2 := hSum
+    _ = ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 := hConst
+    _ ≤ (8 * (n : ℝ) ^ (7 / 8 : ℝ) * T ^ 4) * logBudget n ^ 2 := hMulB
+    _ = 8 * T ^ 4 * logBudget n ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by ring
+    _ = 8 * T ^ 4 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by
+      unfold logBudget; ring
 
 end
 
