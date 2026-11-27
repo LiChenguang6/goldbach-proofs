@@ -1,0 +1,45 @@
+name: cloud lean check
+
+on:
+  push:
+    branches:
+      - ci/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Elan
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch pinned Mathlib and cache
+        working-directory: lean
+        run: |
+          lean --version
+          lake exe cache get
+
+      - name: Compile requested module
+        working-directory: lean
+        run: |
+          set -o pipefail
+          target="$(tr -d '\r' < ../ci-target.txt | head -n 1)"
+          echo "target: $target"
+          lake env lean "$target" 2>&1 | tee /tmp/check.log
+          echo "---- line count of log: $(wc -l < /tmp/check.log) ----"
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloud-check-log
+          path: /tmp/check.log
+          if-no-files-found: warn
