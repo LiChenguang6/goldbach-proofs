@@ -7941,7 +7941,7 @@ theorem b1B1_unbalanced_tail_le (n : ℕ) (hn : 2 ≤ n) {T : ℝ} (TNonneg : 0 
   -- crude moment `(x+1)·T⁴·B²`, then `x ≤ n^{3/4}` folds the count into
   -- `8·n^{7/8}`. Exponent 7/8 < 23/24 leaves margin for `finalScale`.
   have nPositive : 0 < n := by omega
-  have nOne : 1 ≤ (n : ℝ) := by exact_mod_cast hn
+  have nOne : 1 ≤ (n : ℝ) := Nat.one_le_cast.mpr (by omega)
   have hB0 : 0 ≤ logBudget n := zero_le_one.trans (one_le_logBudget n)
   have hT2B : 0 ≤ T ^ 2 * logBudget n := mul_nonneg (pow_nonneg TNonneg 2) hB0
   have hPoint : ∀ m ∈ range (x + 1),
@@ -7989,8 +7989,9 @@ theorem b1B1_unbalanced_tail_le (n : ℕ) (hn : 2 ≤ n) {T : ℝ} (TNonneg : 0 
     ‖∑ m ∈ range (x + 1), (τ₁ n m : ℂ) * (τ₁ n (n - m) : ℂ)‖
       ≤ ∑ m ∈ range (x + 1), T ^ 4 * logBudget n ^ 2 := hSum
     _ = ((x : ℝ) + 1) * T ^ 4 * logBudget n ^ 2 := hConst
-    _ ≤ 8 * T ^ 4 * logBudget n ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) :=
+    _ ≤ 8 * (n : ℝ) ^ (7 / 8 : ℝ) * T ^ 4 * logBudget n ^ 2 :=
       mul_le_mul_of_nonneg_right hCount hNonneg
+    _ = 8 * T ^ 4 * logBudget n ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by ring
     _ = 8 * T ^ 4 * (1 + Real.log ((n : ℝ) + 2)) ^ 2 * (n : ℝ) ^ (7 / 8 : ℝ) := by
       unfold logBudget; ring
 
