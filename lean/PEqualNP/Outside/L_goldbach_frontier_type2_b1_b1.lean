@@ -7009,6 +7009,26 @@ private theorem b1B1_inner_moebius_le (n a : ℕ) :
       sum_le_sum_of_subset_of_nonneg (filter_subset _ _) (fun _ _ _ => zero_le_one)
     _ = (a.divisors.card : ℝ) := by rw [sum_const, nsmul_eq_mul, mul_one]
 
+/-- Non-private wrapper exposing `b1B1_inner_moebius_le` for the main segment
+    and the route-C fibre bound. -/
+theorem b1B1_inner_moebius_bound (n a : ℕ) :
+    ‖(∑ d ∈ (Nat.divisors a).filter (fun d => U n < d), μ d : ℂ)‖ ≤
+      (a.divisors.card : ℝ) := by
+  set s := (Nat.divisors a).filter (fun d => U n < d)
+  have h : ‖(∑ d ∈ s, (μ d : ℂ))‖ ≤ ∑ d ∈ s, ‖(μ d : ℂ)‖ :=
+    norm_sum_le s (fun d => (μ d : ℂ))
+  calc
+    _ ≤ ∑ d ∈ s, ‖(μ d : ℂ)‖ := h
+    _ ≤ ∑ d ∈ s, (1 : ℝ) := by
+      refine sum_le_sum fun d _ => ?_
+      have key : ‖((ArithmeticFunction.moebius d : ℤ) : ℂ)‖ ≤ 1 := by
+        rw [Complex.norm_intCast]
+        exact_mod_cast abs_moebius_le_one (n := d)
+      exact key
+    _ ≤ ∑ _ ∈ Nat.divisors a, (1 : ℝ) :=
+      sum_le_sum_of_subset_of_nonneg (filter_subset _ _) (fun _ _ _ => zero_le_one)
+    _ = _ := by rw [sum_const, nsmul_eq_mul, mul_one]
+
 /-- Low-band coefficient L∞ bound: `|τ₁ n m| ≤ d(m)^2 · log n`.
     Isomorphic to reference `abs_lowBandCoefficient_le` (L6818), with
     `U ↦ U n`, `B ↦ B₁ n`; the inner μ-sum is the reference `lowMoebiusWeight`. -/
@@ -7245,6 +7265,55 @@ def lowAtomUpper (p : ℕ × ℕ) : ℕ := p.2
 def lowAtomWeight (n : ℕ) (p : ℕ × ℕ) : ℂ :=
   (∑ d ∈ (Nat.divisors p.1).filter (fun d => U n < d), μ d : ℂ) *
     (vonMangoldt p.2 : ℂ)
+
+/-- Route-C outer index set: divisor-side `a ∈ Ioc (U n) (B₁ n)`. -/
+def b1B1_divSideAtoms (n : ℕ) : Finset ℕ := Ioc (U n) (B₁ n)
+
+theorem mem_b1B1_divSideAtoms {n a : ℕ} :
+    a ∈ b1B1_divSideAtoms n ↔ U n < a ∧ a ≤ B₁ n := by
+  simp [b1B1_divSideAtoms, mem_Ioc]
+
+/-- Route-C outer weight: inner Möbius sum only, no `Λ b` factor; the
+    cofactor `Λ b` energy is pushed down to the inner primitive/G4 layer. -/
+def b1B1_divSideWeight (n : ℕ) (a : ℕ) : ℂ :=
+  ∑ d ∈ (Nat.divisors a).filter (fun d => U n < d), μ d
+
+/-- Route-C fibre weight bound: each fibre has at most one entry, so the fibre
+    sum reduces to the single-entry divisor-card bound `≤ T`. -/
+theorem b1B1_divSide_fibreWeight_le (n : ℕ) (hn : 1 ≤ n)
+    {T : ℝ} (TNonnegative : 0 ≤ T)
+    (divisorBound : ∀ m ≤ n, (m.divisors.card : ℝ) ≤ T) :
+    ∀ u ∈ Icc 1 (B₁ n),
+      ∑ a ∈ (b1B1_divSideAtoms n).filter (fun a => a = u),
+        ‖b1B1_divSideWeight n a‖ ≤ T := by
+  intro u _hu
+  by_cases hmem : u ∈ b1B1_divSideAtoms n
+  · have hB1 : u ≤ B₁ n := (mem_b1B1_divSideAtoms.mp hmem).2
+    have uLeBM : u ≤ b1B1_stepLow n :=
+      hB1.trans (b1B1_B1_le_stepLow hn)
+    have uLeN : u ≤ n := uLeBM.trans (b1B1_stepLow_le_n hn)
+    have hbound : ‖b1B1_divSideWeight n u‖ ≤ (u.divisors.card : ℝ) :=
+      GoldbachB1B1LowCoeff.b1B1_inner_moebius_bound n u
+    have hT : (u.divisors.card : ℝ) ≤ T := divisorBound u uLeN
+    have hFilt : (b1B1_divSideAtoms n).filter (fun a => a = u) = {u} := by
+      ext a
+      simp only [mem_filter, mem_singleton]
+      constructor
+      · intro ha
+        exact ha.2
+      · intro hEq
+        exact ⟨hEq.symm ▸ hmem, hEq⟩
+    rw [hFilt]
+    simpa using hbound.trans hT
+  · have hSum : ∑ a ∈ (b1B1_divSideAtoms n).filter (fun a => a = u),
+        ‖b1B1_divSideWeight n a‖ = 0 := by
+      apply sum_eq_zero
+      intro a ha
+      have hmem' := (mem_filter.mp ha).1
+      have hEq := (mem_filter.mp ha).2
+      exact False.elim (hmem (hEq.symm ▸ hmem'))
+    rw [hSum]
+    exact TNonnegative
 
 /-- G: offWave expansion of the same low band over the atom set. -/
 def lowOutsidePolynomial (n : ℕ) (t : ℝ) : ℂ :=
